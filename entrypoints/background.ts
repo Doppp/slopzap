@@ -3,6 +3,7 @@ import { browser } from 'wxt/browser';
 import { parseRequest } from '../src/messaging/protocol';
 import { parseSettings } from '../src/shared/types';
 import * as cache from '../src/cache/db';
+import { classify } from '../src/classifier/local';
 
 export default defineBackground(() => {
   void browser.storage.local.setAccessLevel({
@@ -13,10 +14,17 @@ export default defineBackground(() => {
     const request = parseRequest(value);
     if (!request) return false;
     // Settings mutations and destructive cache controls are trusted-page only.
-    if (sender.tab && ['SETTINGS_SET', 'CACHE_CLEAR'].includes(request.type))
+    if (
+      !sender.url?.startsWith(browser.runtime.getURL('/')) &&
+      ['SETTINGS_SET', 'CACHE_CLEAR'].includes(request.type)
+    )
       return false;
     const handle = async () => {
       switch (request.type) {
+        case 'CLASSIFY_LOCAL':
+          return request.items.map((item) =>
+            classify(item.unit, item.fingerprint),
+          );
         case 'SETTINGS_GET':
           return parseSettings(
             (await browser.storage.local.get('settings')).settings,

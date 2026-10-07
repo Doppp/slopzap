@@ -1,6 +1,7 @@
-import type { Result, Verdict } from '../shared/types';
+import type { Result, Verdict, Unit } from '../shared/types';
 
 export type Request =
+  | { type: 'CLASSIFY_LOCAL'; items: { unit: Unit; fingerprint: string }[] }
   | { type: 'SETTINGS_GET' }
   | { type: 'SETTINGS_SET'; settings: unknown }
   | { type: 'CACHE_GET'; keys: string[] }
@@ -41,6 +42,14 @@ export function parseRequest(value: unknown): Request | null {
     return null;
   const r = value as Request;
   switch (r.type) {
+    case 'CLASSIFY_LOCAL':
+      return Array.isArray(r.items) &&
+        r.items.length <= 16 &&
+        r.items.every(
+          (item) => keyValid(item.fingerprint) && validUnit(item.unit),
+        )
+        ? r
+        : null;
     case 'SETTINGS_GET':
       return r;
     case 'SETTINGS_SET':
@@ -66,4 +75,28 @@ export function parseRequest(value: unknown): Request | null {
     default:
       return null;
   }
+}
+
+function validUnit(value: unknown): value is Unit {
+  if (!value || typeof value !== 'object') return false;
+  const unit = value as Unit;
+  return (
+    ['reddit', 'youtube', 'linkedin', 'x', 'medium', 'synthetic'].includes(
+      unit.platform,
+    ) &&
+    [
+      'post',
+      'comment',
+      'reply',
+      'quote_commentary',
+      'article',
+      'article_response',
+    ].includes(unit.kind) &&
+    typeof unit.id === 'string' &&
+    unit.id.length <= 500 &&
+    (unit.parentId === null || typeof unit.parentId === 'string') &&
+    [unit.text, unit.parentText, unit.rootText, unit.quotedText].every(
+      (text) => typeof text === 'string' && text.length <= 12000,
+    )
+  );
 }

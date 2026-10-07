@@ -96,15 +96,13 @@ export async function save(results: Result[]): Promise<void> {
   const transaction = connection.transaction('results', 'readwrite');
   const completion = completed(transaction);
   for (const result of results)
-    transaction
-      .objectStore('results')
-      .put({
-        key: result.fingerprint,
-        result,
-        accessed: Date.now(),
-        expires:
-          Date.now() + (result.status === 'classified' ? TTL : 7 * 86400000),
-      } satisfies RecordValue);
+    transaction.objectStore('results').put({
+      key: result.fingerprint,
+      result,
+      accessed: Date.now(),
+      expires:
+        Date.now() + (result.status === 'classified' ? TTL : 7 * 86400000),
+    } satisfies RecordValue);
   await completion;
   await evict();
 }
@@ -112,14 +110,12 @@ export async function override(key: string, verdict: Verdict): Promise<void> {
   const connection = await db();
   const transaction = connection.transaction('overrides', 'readwrite');
   const completion = completed(transaction);
-  transaction
-    .objectStore('overrides')
-    .put({
-      key,
-      verdict,
-      accessed: Date.now(),
-      expires: Date.now() + 365 * 86400000,
-    } satisfies RecordValue);
+  transaction.objectStore('overrides').put({
+    key,
+    verdict,
+    accessed: Date.now(),
+    expires: Date.now() + 365 * 86400000,
+  } satisfies RecordValue);
   await completion;
 }
 export async function clear(store: 'results' | 'overrides'): Promise<void> {
