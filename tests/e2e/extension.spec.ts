@@ -9,6 +9,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
+import type { AdapterHealthSnapshot } from '../../src/content/adapter-health';
 
 let context: BrowserContext, page: Page, extensionId: string, profile: string;
 test.beforeEach(async () => {
@@ -63,7 +64,8 @@ async function mode(value: string) {
 }
 async function snapshot(): Promise<{
   stats: { classifications: number; candidates: number; bound: number };
-  aggregate: { analysed: number };
+  aggregate: { analysed: number; corrected: number };
+  health: AdapterHealthSnapshot;
 }> {
   return context.serviceWorkers()[0]!.evaluate(async () => {
     const chrome = (
@@ -96,7 +98,8 @@ async function snapshot(): Promise<{
     throw new Error('No active SlopZap route');
   }) as unknown as Promise<{
     stats: { classifications: number; candidates: number; bound: number };
-    aggregate: { analysed: number };
+    aggregate: { analysed: number; corrected: number };
+    health: AdapterHealthSnapshot;
   }>;
 }
 test('classifies separate replies, preserves context, reveals and restores', async () => {
@@ -297,6 +300,152 @@ test('host scripts cannot spoof local feedback clicks', async () => {
     .evaluate((button) => (button as HTMLElement).click());
   await mode('Slop Blocker');
   await expect(reply.locator('[slot="comment"]')).toBeVisible();
+});
+
+test('unreliable parsing restores the page, stays paused and supports explicit retry', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  await expect(reply.locator('[slot="comment"]')).toBeHidden();
+  await page.evaluate(() => {
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < 25; index++) {
+      const malformed = document.createElement('shreddit-comment');
+      malformed.dataset.brokenFixture = 'true';
+      malformed.style.display = 'block';
+      malformed.textContent =
+        'Invented placeholder with no identifiable authored body.';
+      fragment.append(malformed);
+    }
+    document.querySelector('main')!.append(fragment);
+  });
+  await expect
+    .poll(async () => (await snapshot()).health.code)
+    .toBe('adapter_parse_failures');
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
+  await expect(reply.locator('[slot="comment"]')).toBeVisible();
+  expect((await snapshot()).stats).toMatchObject({ bound: 0, candidates: 0 });
+  expect((await snapshot()).aggregate.analysed).toBe(0);
+  const paused = (await snapshot()).health;
+  await mode('Slop Only');
+  await expect.poll(async () => (await snapshot()).health).toEqual(paused);
+  const settings = await context.newPage();
+  await settings.goto(`chrome-extension://${extensionId}/options.html`);
+  const enabled = settings.getByRole('checkbox', { name: 'SlopZap enabled' });
+  await enabled.uncheck();
+  await expect(enabled).not.toBeChecked();
+  await enabled.check();
+  await expect(enabled).toBeChecked();
+  await settings.close();
+  await expect.poll(async () => (await snapshot()).health).toEqual(paused);
+
+  // Repairing markup or changing settings alone must not silently resume parsing.
+  await page
+    .locator('[data-broken-fixture]')
+    .evaluateAll((nodes) => nodes.forEach((node) => node.remove()));
+  await mode('Normal');
+  const popup = await context.newPage();
+  await page.bringToFront();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  await expect(
+    popup.getByRole('heading', { name: 'SlopZap paused on this page' }),
+  ).toBeVisible();
+  expect((await new AxeBuilder({ page: popup }).analyze()).violations).toEqual(
+    [],
+  );
+  await popup.screenshot({
+    path: 'test-results/adapter-paused-popup.png',
+    fullPage: true,
+  });
+  await popup.getByRole('button', { name: 'Retry page check' }).click();
+  await expect.poll(async () => (await snapshot()).health.code).toBeNull();
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(3);
+  await popup.close();
+  await mode('Slop Blocker');
+  await expect(reply.locator('[slot="comment"]')).toBeHidden();
+});
+
+test('repeated edits to one malformed candidate do not inflate health counts', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  await page.evaluate(() => {
+    const malformed = document.createElement('shreddit-comment');
+    malformed.id = 'repeated-invalid';
+    malformed.textContent = 'Invented placeholder without an authored body.';
+    document.querySelector('main')!.prepend(malformed);
+  });
+  await expect.poll(async () => (await snapshot()).health.sampled).toBe(4);
+  for (let index = 0; index < 22; index++) {
+    await page.locator('#repeated-invalid').evaluate((node, value) => {
+      const body = document.createElement('div');
+      body.slot = 'comment';
+      body.textContent = `I tested this invented revision ${value} and measured the cache latency at forty milliseconds.`;
+      node.replaceChildren(body);
+    }, index);
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(4);
+    await page.locator('#repeated-invalid').evaluate((node) => {
+      node.replaceChildren('Invented placeholder without an authored body.');
+    });
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  }
+  expect((await snapshot()).health).toMatchObject({
+    code: null,
+    sampled: 4,
+    rejected: 1,
+  });
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+});
+
+test('ambiguous authored bodies are rejected and stale scores are removed', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  await page
+    .locator('shreddit-comment[thingid="reply-1"]')
+    .getByRole('button', { name: 'SlopZap: Not slop', exact: true })
+    .click();
+  await expect.poll(async () => (await snapshot()).aggregate.corrected).toBe(1);
+  await page.locator('shreddit-comment[thingid="reply-1"]').evaluate((node) => {
+    const competingBody = document.createElement('div');
+    competingBody.slot = 'comment';
+    competingBody.textContent =
+      'A second invented authored body cannot be safely attributed.';
+    node.append(competingBody);
+  });
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(2);
+  await expect.poll(async () => (await snapshot()).aggregate.corrected).toBe(0);
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(2);
+  await expect(
+    page.locator('shreddit-comment[thingid="reply-1"] [slot="comment"]'),
+  ).toHaveCount(2);
+  expect((await snapshot()).health.code).toBeNull();
+});
+
+test('parser exceptions pause immediately without exporting page or error text; navigation recovers', async () => {
+  const harness = await context.newPage();
+  await harness.goto(`chrome-extension://${extensionId}/harness.html`);
+  await expect(harness.locator('[data-slopzap-ui]').first()).toBeVisible();
+  // Extension-page fixtures share the runtime realm, allowing a deterministic parser fault.
+  await harness.evaluate(() => {
+    const malformed = document.createElement('article');
+    malformed.dataset.szUnit = 'true';
+    malformed.textContent = 'invented-private-content-marker';
+    malformed.querySelectorAll = () => {
+      throw new Error('invented-private-error-marker');
+    };
+    document.querySelector('[data-sz-feed]')!.prepend(malformed);
+  });
+  await page.close();
+  await expect
+    .poll(async () => (await snapshot()).health.code)
+    .toBe('adapter_parse_exception');
+  await expect(harness.locator('[data-slopzap-ui]')).toHaveCount(0);
+  const diagnostic = JSON.stringify(await snapshot());
+  expect(diagnostic).not.toContain('invented-private');
+  expect(diagnostic).not.toContain('chrome-extension:');
+  await harness.getByRole('button', { name: 'New thread' }).click();
+  await expect.poll(async () => (await snapshot()).health.code).toBeNull();
+  await expect(harness.locator('[data-slopzap-ui]').first()).toBeVisible();
 });
 
 test('fresh install opens one accessible setup and saves the chosen view and sites', async () => {
