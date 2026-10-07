@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import {
   ChromePromptProvider,
+  downloadModel,
   type ModelFactory,
   type ModelSession,
 } from '../src/providers/chrome-prompt';
@@ -40,7 +41,11 @@ test('schema validation rejects arbitrary IDs, prose, extra fields and out-of-ra
       },
       inputs,
     ),
-  ).toEqual([result]);
+  ).toEqual([]);
+  expect(validateOutput({ results: [result] }, inputs)).toEqual([result]);
+  expect(() =>
+    validateOutput({ results: [result], prose: 'untrusted' }, inputs),
+  ).toThrow();
 });
 test('each batch uses a fresh cloned session and destroys it', async () => {
   const destroy = vi.fn();
@@ -96,4 +101,26 @@ test('provider disagreement never authorizes automatic hiding', () => {
   });
   expect(result.automaticHide).toBe(false);
   expect(result.evidence).toBeLessThan(0.6);
+});
+test('user-triggered model preparation monitors progress and releases its session', async () => {
+  const destroy = vi.fn(),
+    progress = vi.fn();
+  const controller = new AbortController();
+  const api: ModelFactory = {
+    availability: vi.fn(),
+    create: vi.fn().mockImplementation(async (options) => {
+      const monitor = new EventTarget();
+      options.monitor(monitor);
+      monitor.dispatchEvent(
+        Object.assign(new Event('downloadprogress'), { loaded: 0.5 }),
+      );
+      return { destroy };
+    }),
+  };
+  await downloadModel(controller.signal, progress, api);
+  expect(progress).toHaveBeenCalledWith(0.5);
+  expect(destroy).toHaveBeenCalledTimes(1);
+  expect(api.create).toHaveBeenCalledWith(
+    expect.objectContaining({ signal: controller.signal }),
+  );
 });

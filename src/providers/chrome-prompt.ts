@@ -5,6 +5,8 @@ import {
   type ProviderInput,
   type ProviderResult,
 } from './types';
+import { articleChunks, combineArticle } from './long-form';
+import { abortable } from '../shared/async';
 
 export interface ModelSession {
   clone(options: { signal: AbortSignal }): Promise<ModelSession>;
@@ -28,21 +30,41 @@ export function factory(): ModelFactory | undefined {
   return (globalThis as unknown as { LanguageModel?: ModelFactory })
     .LanguageModel;
 }
-export async function downloadModel(): Promise<void> {
-  const api = factory();
+export async function downloadModel(
+  signal?: AbortSignal,
+  progress?: (fraction: number) => void,
+  api: ModelFactory | undefined = factory(),
+): Promise<void> {
   if (!api)
     throw new Error('Chrome on-device AI is unavailable on this device.');
   // Called only from the options-page user click. No background model download.
-  const session = await api.create({
+  const pending = api.create({
     ...OPTIONS,
+    ...(signal ? { signal } : {}),
+    monitor(monitor: EventTarget) {
+      monitor.addEventListener('downloadprogress', (event) => {
+        const loaded = (event as Event & { loaded?: number }).loaded;
+        if (typeof loaded === 'number' && Number.isFinite(loaded))
+          progress?.(Math.min(1, Math.max(0, loaded)));
+      });
+    },
     initialPrompts: [{ role: 'system', content: INSTRUCTIONS }],
   });
+  void pending.then(
+    (session) => {
+      if (signal?.aborted) session.destroy();
+    },
+    () => {},
+  );
+  const session = signal ? await abortable(pending, signal) : await pending;
   session.destroy();
+  signal?.throwIfAborted();
 }
 export class ChromePromptProvider implements Provider {
   readonly id = 'chrome_prompt';
   private session: Promise<ModelSession> | undefined;
   private disposed = false;
+  private lifetime = new AbortController();
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   constructor(private api: ModelFactory | undefined = factory()) {}
   async ready(): Promise<boolean> {
@@ -57,21 +79,55 @@ export class ChromePromptProvider implements Provider {
     signal: AbortSignal,
   ): Promise<ProviderResult[]> {
     if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
-    if (!(await this.ready()) || inputs.length > 12) return [];
+    if (!(await abortable(this.ready(), signal)) || inputs.length > 12)
+      return [];
+    const articles = new Map(
+      inputs
+        .filter(
+          (input) =>
+            input.unit.kind === 'article' && input.unit.text.length >= 3600,
+        )
+        .map((input) => [input.id, articleChunks(input)]),
+    );
+    const expanded = inputs.flatMap(
+      (input) => articles.get(input.id) ?? [input],
+    );
+    if (expanded.length > 12) return [];
     this.session ??= this.api!.create({
       ...OPTIONS,
+      signal: this.lifetime.signal,
       initialPrompts: [{ role: 'system', content: INSTRUCTIONS }],
+    }).catch((error) => {
+      this.session = undefined;
+      throw error;
     });
-    const base = await this.session;
+    const base = await abortable(this.session, signal);
     if (this.disposed || signal.aborted) throw new Error('Provider cancelled');
-    const clone = await base.clone({ signal });
+    const cloning = base.clone({ signal });
+    void cloning.then(
+      (clone) => {
+        if (signal.aborted) clone.destroy();
+      },
+      () => {},
+    );
+    const clone = await abortable(cloning, signal);
     try {
-      const raw = await clone.prompt(JSON.stringify({ items: inputs }), {
+      const raw = await abortable(
+        clone.prompt(JSON.stringify({ items: expanded }), {
+          signal,
+          responseConstraint: RESPONSE_SCHEMA,
+        }),
         signal,
-        responseConstraint: RESPONSE_SCHEMA,
-      });
+      );
       if (raw.length > 32_000) throw new Error('Oversized provider response');
-      return validateOutput(JSON.parse(raw), inputs);
+      const results = validateOutput(JSON.parse(raw), expanded);
+      return inputs.flatMap((input) => {
+        const chunks = articles.get(input.id);
+        const result = chunks
+          ? combineArticle(input, chunks, results)
+          : results.find((result) => result.id === input.id);
+        return result ? [result] : [];
+      });
     } finally {
       clone.destroy();
       this.idleTimer = setTimeout(() => {
@@ -84,6 +140,7 @@ export class ChromePromptProvider implements Provider {
     }
   }
   close(): void {
+    this.lifetime.abort();
     if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
     this.disposed = true;
     if (this.session)
