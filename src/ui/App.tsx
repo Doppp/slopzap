@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { browser } from 'wxt/browser';
 import {
   DEFAULT_SETTINGS,
@@ -10,6 +10,7 @@ import './styles.css';
 import { downloadModel } from '../providers/chrome-prompt';
 import { parseOnboarding } from '../state/onboarding';
 import type { AdapterHealthSnapshot } from '../content/adapter-health';
+import { diagnostics } from '../shared/diagnostics';
 
 interface PageState {
   supported: boolean;
@@ -25,6 +26,9 @@ export function App({ options = false }: { options?: boolean }) {
   const [message, setMessage] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const modelAbort = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => modelAbort.current?.abort(), []);
   const [needsSetup, setNeedsSetup] = useState(false);
   useEffect(() => {
     void browser.runtime
@@ -110,20 +114,75 @@ export function App({ options = false }: { options?: boolean }) {
     }
   };
   const enableModel = async () => {
+    const controller = new AbortController();
+    modelAbort.current = controller;
     setDownloading(true);
+    setProgress(null);
     setMessage('Preparing Chrome on-device AI. Keep this settings page open.');
     try {
-      await downloadModel();
+      await downloadModel(controller.signal, setProgress);
+      if (controller.signal.aborted) return;
       await update({ onDevice: true });
       setMessage(
         'Chrome on-device analysis enabled where the API is available.',
       );
     } catch {
       setMessage(
-        'Chrome on-device AI is unavailable or could not be prepared. Local analysis continues.',
+        controller.signal.aborted
+          ? 'Preparation cancelled. Local analysis continues.'
+          : 'Chrome on-device AI is unavailable or could not be prepared. Local analysis continues.',
       );
     } finally {
       setDownloading(false);
+      modelAbort.current = undefined;
+    }
+  };
+  const exportDiagnostics = async () => {
+    try {
+      const pages = [];
+      for (const tab of (
+        await browser.tabs.query({ currentWindow: true })
+      ).slice(0, 20)) {
+        if (!tab.id) continue;
+        try {
+          const value = await browser.tabs.sendMessage(tab.id, {
+            type: 'SNAPSHOT',
+          });
+          if (value?.supported) pages.push(diagnostics(value));
+        } catch {
+          /* unsupported tabs are omitted */
+        }
+      }
+      const version = browser.runtime.getManifest().version;
+      const chrome =
+        navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/)?.[1] ?? 'unknown';
+      const url = URL.createObjectURL(
+        new Blob(
+          [
+            JSON.stringify(
+              {
+                schemaVersion: 1,
+                extensionVersion: version,
+                chromeMajorVersion: chrome,
+                pages,
+              },
+              null,
+              2,
+            ),
+          ],
+          { type: 'application/json' },
+        ),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'slopzap-diagnostics.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage(
+        'Local diagnostics exported. Review the file before sharing; nothing was uploaded.',
+      );
+    } catch {
+      setMessage('Diagnostics could not be exported.');
     }
   };
   return (
@@ -140,8 +199,10 @@ export function App({ options = false }: { options?: boolean }) {
         >
           <h2>SlopZap paused on this page</h2>
           <p>
-            This page could not be read reliably. SlopZap has restored its
-            changes and stopped analysis.
+            {page.health.code === 'classifier_unavailable'
+              ? 'Local analysis is unavailable.'
+              : 'This page could not be read reliably.'}{' '}
+            SlopZap has restored its changes and stopped analysis.
           </p>
           <p>
             Local diagnostic: <code>{page.health.code}</code>
@@ -246,6 +307,25 @@ export function App({ options = false }: { options?: boolean }) {
                   ? 'Disable on-device AI'
                   : 'Enable Chrome on-device AI'}
             </button>
+            {downloading && (
+              <>
+                <p>
+                  {progress === null
+                    ? 'Preparing model…'
+                    : progress < 1
+                      ? `Downloading model · ${Math.round(progress * 100)}%`
+                      : 'Download complete · loading model…'}
+                </p>
+                <progress
+                  aria-label="Model download progress"
+                  max="1"
+                  {...(progress === null ? {} : { value: progress })}
+                />
+                <button onClick={() => modelAbort.current?.abort()}>
+                  Cancel preparation
+                </button>
+              </>
+            )}
           </section>
           <section>
             <h2>Supported sites</h2>
@@ -304,6 +384,29 @@ export function App({ options = false }: { options?: boolean }) {
                 }
               />
             </label>
+          </section>
+          <section>
+            <h2>Local diagnostics</h2>
+            <label className="toggle">
+              <span>Record timing diagnostics</span>
+              <input
+                type="checkbox"
+                checked={settings.debug}
+                disabled={!loaded}
+                onChange={(event) =>
+                  void update({ debug: event.currentTarget.checked })
+                }
+              />
+            </label>
+            <p>
+              Optional bounded timing samples stay in tab memory. Export
+              includes counts, failure codes and preferences for up to 20 open
+              supported tabs, never text, identities, fingerprints or URLs.
+              Nothing is uploaded.
+            </p>
+            <button onClick={() => void exportDiagnostics()}>
+              Export local diagnostics
+            </button>
           </section>
           <section>
             <h2>Your data stays here</h2>

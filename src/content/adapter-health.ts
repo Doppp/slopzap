@@ -1,5 +1,7 @@
 export type AdapterFailure =
-  'adapter_parse_failures' | 'adapter_parse_exception';
+  | 'adapter_parse_failures'
+  | 'adapter_parse_exception'
+  | 'classifier_unavailable';
 
 export interface AdapterHealthSnapshot {
   code: AdapterFailure | null;

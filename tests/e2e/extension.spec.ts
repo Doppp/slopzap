@@ -254,6 +254,77 @@ test('settings controls are accessible and local-only behavior needs no provider
   await expect(options.getByRole('status')).toContainText('Cache cleared');
 });
 
+test('local diagnostic export contains only whitelisted counts, preferences and timings', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  await options
+    .getByRole('checkbox', { name: 'Record timing diagnostics' })
+    .check();
+  const downloaded = options.waitForEvent('download');
+  await options
+    .getByRole('button', { name: 'Export local diagnostics' })
+    .click();
+  const artifact = await downloaded;
+  const text = await readFile((await artifact.path())!, 'utf8');
+  expect(text).not.toContain('How should we measure');
+  expect(text).not.toContain('Absolutely');
+  expect(text).not.toContain('https://');
+  expect(text).not.toContain('fingerprint');
+  const report = JSON.parse(text);
+  expect(report.pages).toHaveLength(1);
+  expect(report.pages[0]).toMatchObject({
+    platform: 'reddit',
+    settings: { debug: true },
+    stats: { bound: 3 },
+  });
+});
+
+test('model preparation shows progress and can be cancelled without enabling a provider', async () => {
+  const options = await context.newPage();
+  await options.addInitScript(() => {
+    Object.defineProperty(globalThis, 'LanguageModel', {
+      value: {
+        availability: async () => 'downloadable',
+        create: (input: {
+          signal: AbortSignal;
+          monitor(monitor: EventTarget): void;
+        }) =>
+          new Promise((_, reject) => {
+            const monitor = new EventTarget();
+            input.monitor(monitor);
+            setTimeout(
+              () =>
+                monitor.dispatchEvent(
+                  Object.assign(new Event('downloadprogress'), { loaded: 0.5 }),
+                ),
+              10,
+            );
+            input.signal.addEventListener(
+              'abort',
+              () => reject(new DOMException('Cancelled', 'AbortError')),
+              { once: true },
+            );
+          }),
+      },
+    });
+  });
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  await options
+    .getByRole('button', { name: 'Enable Chrome on-device AI' })
+    .click();
+  await expect(
+    options.getByRole('progressbar', { name: 'Model download progress' }),
+  ).toHaveAttribute('value', '0.5');
+  await options.getByRole('button', { name: 'Cancel preparation' }).click();
+  await expect(options.getByRole('status')).toContainText(
+    'Preparation cancelled',
+  );
+  await expect(
+    options.getByRole('button', { name: 'Enable Chrome on-device AI' }),
+  ).toBeEnabled();
+});
+
 test('mode switches and a reload reuse cached scores without inference', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const before = (await snapshot()).stats.classifications;
