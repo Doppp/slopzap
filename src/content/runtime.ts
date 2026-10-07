@@ -366,6 +366,10 @@ export class Runtime {
   }
   private async process(): Promise<void> {
     if (!this.adapter || !this.worker) return;
+    if (!this.isCurrentRoute()) {
+      this.checkRoute();
+      return;
+    }
     this.busy = true;
     const generation = this.generation;
     const batch = Array.from(this.queue)
@@ -405,7 +409,7 @@ export class Runtime {
         if (parentEntry)
           binding.unit.parentText = parentEntry.binding.unit.text.slice(0, 800);
         const key = await fingerprint(binding.unit, this.route);
-        if (generation !== this.generation) return;
+        if (generation !== this.generation || !this.isCurrentRoute()) return;
         if (old?.fingerprint === key && old.result) {
           work.push(old);
           continue;
@@ -447,7 +451,7 @@ export class Runtime {
         } catch {
           /* cache failure does not stop local processing */
         }
-        if (generation !== this.generation) return;
+        if (generation !== this.generation || !this.isCurrentRoute()) return;
         if (this.settings.debug)
           this.metrics.record('cache', performance.now() - cacheStarted);
         for (const entry of missing) {
@@ -471,7 +475,7 @@ export class Runtime {
               fingerprint: entry.fingerprint,
             })),
           );
-          if (generation !== this.generation) return;
+          if (generation !== this.generation || !this.isCurrentRoute()) return;
           if (this.settings.debug)
             this.metrics.record(
               'classify',
@@ -488,7 +492,7 @@ export class Runtime {
             .catch(() => {});
         }
       }
-      if (generation !== this.generation) return;
+      if (generation !== this.generation || !this.isCurrentRoute()) return;
       for (const entry of work)
         if (this.queue.has(entry.binding.container)) entry.renderer.cleanup();
         else if (
@@ -529,6 +533,10 @@ export class Runtime {
   }
   private async processProvider(): Promise<void> {
     if (!this.provider || this.providerBusy || !this.providerQueue.size) return;
+    if (!this.isCurrentRoute()) {
+      this.checkRoute();
+      return;
+    }
     this.providerBusy = true;
     const generation = this.generation;
     const provider = this.provider;
@@ -568,7 +576,7 @@ export class Runtime {
         })),
         AbortSignal.any([this.providerAbort.signal, AbortSignal.timeout(8000)]),
       );
-      if (generation !== this.generation) return;
+      if (generation !== this.generation || !this.isCurrentRoute()) return;
       const saved: Result[] = [];
       for (const item of results) {
         const entry = active.find((entry) => entry.key === item.id);
@@ -623,6 +631,14 @@ export class Runtime {
       result: entry.result,
       verdict: entry.verdict,
     };
+  }
+  private isCurrentRoute(): boolean {
+    const url = new URL(location.href);
+    return (
+      !!this.adapter &&
+      this.adapter.matches(url) &&
+      this.adapter.routeKey(url) === this.route
+    );
   }
   private render(): void {
     if (this.renderFrame) cancelAnimationFrame(this.renderFrame);

@@ -139,8 +139,47 @@ test('dynamic insertions, removals and SPA navigation do not retain stale UI', a
     .locator('shreddit-comment[thingid="dynamic"]')
     .evaluate((node) => node.remove());
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
-  await page.evaluate(() => history.pushState({}, '', '/messages/inbox'));
+  const beforePrivate = (await snapshot()).stats.classifications;
+  await page.evaluate(() => {
+    history.pushState({}, '', '/messages/inbox');
+    const comment = document.createElement('shreddit-comment');
+    comment.setAttribute('thingid', 'private-fixture');
+    const body = document.createElement('div');
+    body.slot = 'comment';
+    body.textContent =
+      'This invented private message must never be classified even during an SPA transition.';
+    comment.append(body);
+    document.querySelector('main')!.append(comment);
+  });
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
+  const afterPrivate = await context.serviceWorkers()[0]!.evaluate(async () => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          tabs: {
+            query(input: object): Promise<{ id?: number }[]>;
+            sendMessage(
+              id: number,
+              input: object,
+            ): Promise<{ stats?: { classifications: number } }>;
+          };
+        };
+      }
+    ).chrome;
+    for (const tab of await api.tabs.query({}))
+      if (tab.id) {
+        try {
+          const value = await api.tabs.sendMessage(tab.id, {
+            type: 'SNAPSHOT',
+          });
+          if (value?.stats) return value.stats.classifications;
+        } catch {
+          /* non-runtime tab */
+        }
+      }
+    return null;
+  });
+  expect(afterPrivate).toBe(beforePrivate);
 });
 
 for (const scenario of [
