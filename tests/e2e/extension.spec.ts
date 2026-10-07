@@ -8,6 +8,7 @@ import {
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
+import AxeBuilder from '@axe-core/playwright';
 
 let context: BrowserContext, page: Page, extensionId: string, profile: string;
 test.beforeEach(async () => {
@@ -161,4 +162,16 @@ test('a thousand loaded comments do not trigger eager inference', async () => {
   await expect(
     page.locator('shreddit-comment[thingid="item-500"] [data-slopzap-ui]'),
   ).toHaveCount(1);
+});
+
+test('settings controls are accessible and local-only behavior needs no provider', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  await expect(
+    options.getByRole('button', { name: 'Slop Goggles', exact: true }),
+  ).toBeEnabled();
+  const result = await new AxeBuilder({ page: options }).analyze();
+  expect(result.violations).toEqual([]);
+  await options.getByRole('button', { name: 'Clear score cache' }).click();
+  await expect(options.getByRole('status')).toContainText('Cache cleared');
 });
