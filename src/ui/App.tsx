@@ -7,7 +7,7 @@ import {
   type Platform,
 } from '../shared/types';
 import './styles.css';
-import { downloadModel } from '../providers/chrome-prompt';
+import { downloadModel, availability } from '../providers/chrome-prompt';
 import { parseOnboarding } from '../state/onboarding';
 import type { AdapterHealthSnapshot } from '../content/adapter-health';
 import { diagnostics } from '../shared/diagnostics';
@@ -27,8 +27,12 @@ export function App({ options = false }: { options?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  const [modelAvailability, setModelAvailability] = useState('checking');
   const modelAbort = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => modelAbort.current?.abort(), []);
+  useEffect(() => {
+    if (options) void availability().then(setModelAvailability);
+  }, []);
   const [needsSetup, setNeedsSetup] = useState(false);
   useEffect(() => {
     void browser.runtime
@@ -288,13 +292,19 @@ export function App({ options = false }: { options?: boolean }) {
         <>
           <section>
             <h2>Optional on-device AI</h2>
+            <p>Model availability: {modelAvailability}</p>
             <p>
               Chrome can analyse context using its own local model on supported
               hardware. Enabling it may download a large model. Page text stays
               on your device.
             </p>
             <button
-              disabled={!loaded || downloading}
+              disabled={
+                !loaded ||
+                downloading ||
+                (!settings.onDevice &&
+                  ['checking', 'unavailable'].includes(modelAvailability))
+              }
               onClick={() =>
                 settings.onDevice
                   ? void update({ onDevice: false })

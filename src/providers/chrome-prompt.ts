@@ -30,6 +30,20 @@ export function factory(): ModelFactory | undefined {
   return (globalThis as unknown as { LanguageModel?: ModelFactory })
     .LanguageModel;
 }
+export async function availability(
+  api: ModelFactory | undefined = factory(),
+): Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'> {
+  try {
+    const value = await api?.availability(OPTIONS);
+    return value === 'available' ||
+      value === 'downloadable' ||
+      value === 'downloading'
+      ? value
+      : 'unavailable';
+  } catch {
+    return 'unavailable';
+  }
+}
 export async function downloadModel(
   signal?: AbortSignal,
   progress?: (fraction: number) => void,
