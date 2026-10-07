@@ -18,6 +18,8 @@ Local scores expire after 90 days, insufficient-evidence results after seven day
 
 Quick setup stores only its version and local presentation/completion booleans, alongside your selected browsing view and site toggles. These preferences are not telemetry. No onboarding analytics, timestamps, account identifiers or progress events are collected or uploaded. Completing or skipping setup does not enable an AI provider or download a model.
 
+Page compatibility health keeps at most 100 parse-success booleans and numeric counters in the active tab's memory. The popup can display a fixed failure code and offer a retry. No page text, URLs, identifiers, fingerprints or exception messages enter these diagnostics, and they are not persisted or uploaded.
+
 ## Optional Chrome on-device model
 
 Off by default. An explicit options-page click may ask Chrome to download its model. Classification input remains on the device; SlopZap has no cloud inference endpoint. Chrome manages download availability, hardware requirements and model updates. SlopZap does not download or execute remote application code.

@@ -31,6 +31,8 @@ Setup opens automatically only once. Closing it unfinished leaves an **Open quic
 
 Adapters target LinkedIn, X/Twitter, YouTube comments, desktop Reddit, and Medium. Selectors live in separate modules and fail open on unexpected markup. Medium custom publication domains and legacy Reddit are outside the current target.
 
+If repeated parsing failures or a parser exception indicate incompatible markup, SlopZap removes its changes and pauses that page route. The popup explains the pause and offers **Retry page check** after markup is repaired. Navigating to a new discussion or reloading also resets the check; changing modes does not bypass it. Ambiguous authored-body matches are left untouched.
+
 ## Privacy and classification
 
 Local analysis is the default. No accounts, API keys, backend, telemetry, inference network requests, browsing-history collection, or full-page uploads. The optional Chrome Prompt API uses a browser-managed on-device model; enabling it may download a large model, and availability depends on hardware/browser support. It is tested through provider mocks; model quality on real hardware is not yet validated.

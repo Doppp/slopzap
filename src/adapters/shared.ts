@@ -64,19 +64,23 @@ interface Config {
   rootTitle?: string;
 }
 export function createAdapter(config: Config): Adapter {
-  const bodyOf = (node: HTMLElement | null) =>
-    node
-      ? (config.bodies
-          .flatMap((selector) =>
-            Array.from(node.querySelectorAll<HTMLElement>(selector)),
-          )
-          .find(
-            (body) =>
-              body.closest(config.candidates) === node &&
-              !body.closest(SENSITIVE) &&
-              !(config.quote && body.closest(config.quote)),
-          ) ?? null)
-      : null;
+  const bodyOf = (node: HTMLElement | null): HTMLElement | null => {
+    if (!node) return null;
+    for (const selector of config.bodies) {
+      const bodies = Array.from(
+        node.querySelectorAll<HTMLElement>(selector),
+      ).filter(
+        (body) =>
+          body.closest(config.candidates) === node &&
+          !body.closest(SENSITIVE) &&
+          !(config.quote && body.closest(config.quote)),
+      );
+      // A fallback is a selector variant, not permission to guess between authors.
+      if (bodies.length > 1) return null;
+      if (bodies.length === 1) return bodies[0]!;
+    }
+    return null;
+  };
   return {
     platform: config.platform,
     roots: config.roots,
