@@ -8,6 +8,7 @@ import {
 } from '../shared/types';
 import './styles.css';
 import { downloadModel } from '../providers/chrome-prompt';
+import { parseOnboarding } from '../state/onboarding';
 
 interface PageState {
   supported: boolean;
@@ -20,7 +21,15 @@ export function App({ options = false }: { options?: boolean }) {
   const [message, setMessage] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
   useEffect(() => {
+    void browser.runtime
+      .sendMessage({ type: 'ONBOARDING_GET' })
+      .then((value) => {
+        if (value && !value.error)
+          setNeedsSetup(!parseOnboarding(value).completed);
+      })
+      .catch(() => {});
     void browser.runtime
       .sendMessage({ type: 'SETTINGS_GET' })
       .then((value) => {
@@ -97,6 +106,20 @@ export function App({ options = false }: { options?: boolean }) {
         <span className="pill">LOCAL</span>
       </header>
       <p className="tagline">Zap AI-style social noise.</p>
+      {!options && needsSetup && (
+        <section className="setup-reminder">
+          <p>New to SlopZap? Choose your view and sites in quick setup.</p>
+          <button
+            onClick={() =>
+              void browser.tabs.create({
+                url: browser.runtime.getURL('/onboarding.html'),
+              })
+            }
+          >
+            Open quick setup
+          </button>
+        </section>
+      )}
       {!options && (
         <section className="meter" aria-label="Slopometer">
           <span className="eyebrow">
@@ -246,6 +269,15 @@ export function App({ options = false }: { options?: boolean }) {
               excluded.
             </p>
             <div className="actions">
+              <button
+                onClick={() =>
+                  void browser.tabs.create({
+                    url: browser.runtime.getURL('/onboarding.html'),
+                  })
+                }
+              >
+                Review quick setup
+              </button>
               <button
                 onClick={() =>
                   void browser.tabs.create({

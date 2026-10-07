@@ -1,9 +1,12 @@
 import type { Result, Verdict, Unit } from '../shared/types';
+import { validChoices, type OnboardingChoices } from '../state/onboarding';
 
 export type Request =
   | { type: 'CLASSIFY_LOCAL'; items: { unit: Unit; fingerprint: string }[] }
   | { type: 'SETTINGS_GET' }
   | { type: 'SETTINGS_SET'; settings: unknown }
+  | { type: 'ONBOARDING_GET' }
+  | { type: 'ONBOARDING_COMPLETE'; choices?: OnboardingChoices }
   | { type: 'CACHE_GET'; keys: string[]; version?: string }
   | { type: 'CACHE_SAVE'; results: Result[] }
   | { type: 'OVERRIDE'; key: string; verdict: Verdict }
@@ -69,6 +72,10 @@ export function parseRequest(value: unknown): Request | null {
       return r;
     case 'SETTINGS_SET':
       return r;
+    case 'ONBOARDING_GET':
+      return r;
+    case 'ONBOARDING_COMPLETE':
+      return r.choices === undefined || validChoices(r.choices) ? r : null;
     case 'CACHE_GET':
       return Array.isArray(r.keys) &&
         r.keys.length <= 50 &&

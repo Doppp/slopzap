@@ -13,7 +13,9 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
-Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `.output/chrome-mv3` inside this repository. Pin SlopZap to your toolbar. Open **Settings & privacy → Open synthetic test feed** to try the complete UI without platform accounts.
+Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `.output/chrome-mv3` inside this repository. On a fresh install, SlopZap opens quick setup automatically: learn what the score means, choose your browsing view, and select sites. Finish with the optional demo or start browsing. Pin SlopZap to your toolbar using Chrome's Extensions menu.
+
+Setup opens automatically only once. Closing it unfinished leaves an **Open quick setup** reminder in the popup; finishing saves completion and preferences locally. Updates and browser restarts preserve your settings. Existing alpha installations can start setup from the popup, and **Settings & privacy → Review quick setup** opens it again whenever you want. The synthetic test feed also stays available in Settings.
 
 `pnpm zip` creates a distributable archive in `.output/`. GitHub's Checks workflow also uploads a tested development-alpha archive. The extension has not been submitted to the Chrome Web Store.
 

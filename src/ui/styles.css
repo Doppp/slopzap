@@ -51,6 +51,16 @@ header {
   padding: 16px;
   margin-bottom: 20px;
 }
+.setup-reminder {
+  border: 1px solid #63512b;
+  border-radius: 8px;
+  padding: 12px;
+  background: #302e24;
+  font-size: 12px;
+}
+.setup-reminder p {
+  margin-top: 0;
+}
 .eyebrow {
   font-size: 11px;
   text-transform: uppercase;

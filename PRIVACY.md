@@ -16,6 +16,8 @@ IndexedDB retains derived scores, controlled reason labels, classifier versions 
 
 Local scores expire after 90 days, insufficient-evidence results after seven days, optional model scores after one day, and corrections after one year. Expiry is enforced on read and expired records are pruned during writes. Limits are 20,000 scores and 5,000 corrections, with oldest-accessed eviction to 80% of each limit. Settings stay in `chrome.storage.local`. Cache and correction controls are separate. Chrome does not necessarily clear extension storage when ordinary browsing data is cleared; use these controls or uninstall the extension.
 
+Quick setup stores only its version and local presentation/completion booleans, alongside your selected browsing view and site toggles. These preferences are not telemetry. No onboarding analytics, timestamps, account identifiers or progress events are collected or uploaded. Completing or skipping setup does not enable an AI provider or download a model.
+
 ## Optional Chrome on-device model
 
 Off by default. An explicit options-page click may ask Chrome to download its model. Classification input remains on the device; SlopZap has no cloud inference endpoint. Chrome manages download availability, hardware requirements and model updates. SlopZap does not download or execute remote application code.
