@@ -175,3 +175,36 @@ a {
     scroll-behavior: auto;
   }
 }
+@media (forced-colors: active) {
+  :root {
+    color: CanvasText;
+    background: Canvas;
+  }
+  button {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+  .selected {
+    color: HighlightText;
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+  .pill,
+  .notice,
+  .tagline,
+  .eyebrow,
+  .meter p,
+  .score,
+  [role='status'] {
+    color: CanvasText;
+  }
+  .meter,
+  .setup-reminder {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+  a {
+    color: LinkText;
+  }
+}

@@ -19,6 +19,8 @@ export class Renderer {
     result: Result | undefined,
     verdict: Verdict | undefined,
   ): void {
+    const focused =
+      this.ui?.shadowRoot?.activeElement?.getAttribute('aria-label');
     this.removeUi();
     if (this.hidden) this.binding.body.hidden = this.originalHidden;
     else this.originalHidden = this.binding.body.hidden;
@@ -73,6 +75,25 @@ export class Renderer {
     if (collapse) this.binding.body.before(host);
     else this.binding.body.after(host);
     this.ui = host;
+    if (focused) {
+      const alternate =
+        focused === 'SlopZap: Show'
+          ? 'SlopZap: Hide'
+          : focused === 'SlopZap: Hide'
+            ? 'SlopZap: Show'
+            : focused;
+      const buttons = Array.from(
+        shadow.querySelectorAll<HTMLButtonElement>('button'),
+      );
+      (
+        buttons.find(
+          (button) => button.getAttribute('aria-label') === focused,
+        ) ??
+        buttons.find(
+          (button) => button.getAttribute('aria-label') === alternate,
+        )
+      )?.focus({ preventScroll: true });
+    }
   }
   private button(label: string, click: () => void): HTMLButtonElement {
     const button = document.createElement('button');
