@@ -11,6 +11,9 @@ import {
   type Verdict,
 } from '../shared/types';
 import { LocalClassifier } from '../classifier/client';
+import { ChromePromptProvider } from '../providers/chrome-prompt';
+import { compose, PROVIDER_VERSION } from '../providers/compose';
+import { CLASSIFIER_VERSION } from '../shared/types';
 import { Renderer } from '../rendering/renderer';
 import {
   aggregate,
@@ -54,6 +57,10 @@ export class Runtime {
   private sequence = 0;
   private renderFrame = 0;
   private classifiedCount = 0;
+  private provider: ChromePromptProvider | undefined;
+  private providerQueue = new Set<Entry>();
+  private providerBusy = false;
+  private providerAbort = new AbortController();
   async start(): Promise<void> {
     try {
       this.settings = parseSettings(
@@ -81,6 +88,7 @@ export class Runtime {
       this.settings = parseSettings(message.settings);
       if (
         previous.enabled !== this.settings.enabled ||
+        previous.onDevice !== this.settings.onDevice ||
         JSON.stringify(previous.sites) !== JSON.stringify(this.settings.sites)
       ) {
         this.route = '';
@@ -137,6 +145,10 @@ export class Runtime {
     this.roots = roots;
     this.adapter = adapter;
     this.worker = new LocalClassifier();
+    this.provider = this.settings.onDevice
+      ? new ChromePromptProvider()
+      : undefined;
+    this.providerAbort = new AbortController();
     this.visibleObserver = new IntersectionObserver((changes) => {
       for (const change of changes) {
         const node = change.target as HTMLElement;
@@ -357,6 +369,9 @@ export class Runtime {
         try {
           const value = await browser.runtime.sendMessage({
             type: 'CACHE_GET',
+            version: this.settings.onDevice
+              ? PROVIDER_VERSION
+              : CLASSIFIER_VERSION,
             keys: missing.map((entry) => entry.fingerprint),
           });
           if (value?.results) cached = value;
@@ -395,6 +410,17 @@ export class Runtime {
       if (this.history.size > 10_000)
         this.history.delete(this.history.keys().next().value!);
       this.render();
+      if (this.provider) {
+        for (const entry of work)
+          if (
+            entry.result?.version === CLASSIFIER_VERSION &&
+            entry.result.status === 'classified' &&
+            !entry.verdict &&
+            this.providerQueue.size < 60
+          )
+            this.providerQueue.add(entry);
+        void this.processProvider();
+      }
       if (this.entries.size > 300)
         for (const node of this.entries.keys()) {
           if (this.entries.size <= 250) break;
@@ -409,6 +435,64 @@ export class Runtime {
       if (generation === this.generation) {
         this.busy = false;
         this.scheduleBatch();
+      }
+    }
+  }
+  private async processProvider(): Promise<void> {
+    if (!this.provider || this.providerBusy || !this.providerQueue.size) return;
+    this.providerBusy = true;
+    const generation = this.generation;
+    const provider = this.provider;
+    const batch = [...this.providerQueue].slice(0, 12);
+    batch.forEach((entry) => this.providerQueue.delete(entry));
+    const active = batch.filter(
+      (entry) =>
+        this.entries.get(entry.binding.container) === entry &&
+        this.eligible.has(entry.binding.container) &&
+        !entry.verdict,
+    );
+    try {
+      const results = await provider.classify(
+        active.map((entry) => ({
+          id: entry.key,
+          unit: {
+            text: entry.binding.unit.text.slice(0, 6000),
+            parentText: entry.binding.unit.parentText,
+            rootText: entry.binding.unit.rootText,
+            quotedText: entry.binding.unit.quotedText,
+            kind: entry.binding.unit.kind,
+            platform: entry.binding.unit.platform,
+          },
+        })),
+        AbortSignal.any([this.providerAbort.signal, AbortSignal.timeout(8000)]),
+      );
+      if (generation !== this.generation) return;
+      const saved: Result[] = [];
+      for (const item of results) {
+        const entry = active.find((entry) => entry.key === item.id);
+        if (
+          !entry?.result ||
+          entry.verdict ||
+          this.entries.get(entry.binding.container) !== entry ||
+          this.queue.has(entry.binding.container)
+        )
+          continue;
+        entry.result = compose(entry.result, item);
+        saved.push(entry.result);
+        this.history.set(entry.fingerprint, this.scored(entry));
+      }
+      if (saved.length) {
+        void browser.runtime
+          .sendMessage({ type: 'CACHE_SAVE', results: saved })
+          .catch(() => {});
+        this.render();
+      }
+    } catch {
+      /* retain the already-rendered local result */
+    } finally {
+      if (generation === this.generation) {
+        this.providerBusy = false;
+        if (this.providerQueue.size) void this.processProvider();
       }
     }
   }
@@ -493,6 +577,11 @@ export class Runtime {
     this.intersection?.disconnect();
     this.visibleObserver?.disconnect();
     this.worker?.close();
+    this.providerAbort.abort();
+    this.provider?.close();
+    this.provider = undefined;
+    this.providerQueue.clear();
+    this.providerBusy = false;
     this.mutation = undefined;
     this.roots = [];
     this.intersection = undefined;

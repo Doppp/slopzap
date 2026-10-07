@@ -58,6 +58,7 @@ function completed(transaction: IDBTransaction): Promise<void> {
 }
 export async function lookup(
   keys: string[],
+  version = CLASSIFIER_VERSION,
 ): Promise<{ results: Result[]; overrides: Record<string, Verdict> }> {
   const connection = await db();
   const transaction = connection.transaction(
@@ -90,7 +91,8 @@ export async function lookup(
         result:
           result &&
           result.expires > now &&
-          result.result?.version === CLASSIFIER_VERSION
+          (result.result?.version === version ||
+            result.result?.version === CLASSIFIER_VERSION)
             ? result.result
             : undefined,
         override:
@@ -118,7 +120,12 @@ export async function save(results: Result[]): Promise<void> {
       result,
       accessed: Date.now(),
       expires:
-        Date.now() + (result.status === 'classified' ? TTL : 7 * 86400000),
+        Date.now() +
+        (result.version.includes('chrome-prompt')
+          ? 86400000
+          : result.status === 'classified'
+            ? TTL
+            : 7 * 86400000),
     } satisfies RecordValue);
   await completion;
   await evict('results', MAX_RECORDS);

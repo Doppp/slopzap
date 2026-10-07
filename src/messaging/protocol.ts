@@ -4,7 +4,7 @@ export type Request =
   | { type: 'CLASSIFY_LOCAL'; items: { unit: Unit; fingerprint: string }[] }
   | { type: 'SETTINGS_GET' }
   | { type: 'SETTINGS_SET'; settings: unknown }
-  | { type: 'CACHE_GET'; keys: string[] }
+  | { type: 'CACHE_GET'; keys: string[]; version?: string }
   | { type: 'CACHE_SAVE'; results: Result[] }
   | { type: 'OVERRIDE'; key: string; verdict: Verdict }
   | { type: 'CACHE_CLEAR'; store: 'results' | 'overrides' };

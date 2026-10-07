@@ -7,6 +7,7 @@ import {
   type Platform,
 } from '../shared/types';
 import './styles.css';
+import { downloadModel } from '../providers/chrome-prompt';
 
 interface PageState {
   supported: boolean;
@@ -18,6 +19,7 @@ export function App({ options = false }: { options?: boolean }) {
   const [page, setPage] = useState<PageState | null>(null);
   const [message, setMessage] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   useEffect(() => {
     void browser.runtime
       .sendMessage({ type: 'SETTINGS_GET' })
@@ -71,10 +73,27 @@ export function App({ options = false }: { options?: boolean }) {
     }
   };
   const score = page?.aggregate.score;
+  const enableModel = async () => {
+    setDownloading(true);
+    setMessage('Preparing Chrome on-device AI. Keep this settings page open.');
+    try {
+      await downloadModel();
+      await update({ onDevice: true });
+      setMessage(
+        'Chrome on-device analysis enabled where the API is available.',
+      );
+    } catch {
+      setMessage(
+        'Chrome on-device AI is unavailable or could not be prepared. Local analysis continues.',
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <div className={options ? 'app options' : 'app'}>
       <header>
-        <div className="brand">⚡ SlopZap</div>
+        <h1 className="brand">⚡ SlopZap</h1>
         <span className="pill">LOCAL</span>
       </header>
       <p className="tagline">Zap AI-style social noise.</p>
@@ -138,6 +157,28 @@ export function App({ options = false }: { options?: boolean }) {
       </p>
       {options ? (
         <>
+          <section>
+            <h2>Optional on-device AI</h2>
+            <p>
+              Chrome can analyse context using its own local model on supported
+              hardware. Enabling it may download a large model. Page text stays
+              on your device.
+            </p>
+            <button
+              disabled={!loaded || downloading}
+              onClick={() =>
+                settings.onDevice
+                  ? void update({ onDevice: false })
+                  : void enableModel()
+              }
+            >
+              {downloading
+                ? 'Preparing model…'
+                : settings.onDevice
+                  ? 'Disable on-device AI'
+                  : 'Enable Chrome on-device AI'}
+            </button>
+          </section>
           <section>
             <h2>Supported sites</h2>
             {Object.entries(settings.sites).map(([site, enabled]) => (

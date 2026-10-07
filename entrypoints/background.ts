@@ -40,7 +40,12 @@ export default defineBackground(() => {
           return settings;
         }
         case 'CACHE_GET':
-          return cache.lookup(request.keys);
+          return cache.lookup(
+            request.keys,
+            typeof request.version === 'string'
+              ? request.version.slice(0, 80)
+              : undefined,
+          );
         case 'CACHE_SAVE':
           await cache.save(request.results);
           return { ok: true };
