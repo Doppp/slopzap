@@ -4,6 +4,7 @@ import {
   type ProviderResult,
 } from './types';
 import { abortable } from '../shared/async';
+import { validUnit } from '../messaging/protocol';
 // Deliberately not imported by a production entrypoint. No fetch, OAuth or credential storage.
 export const REMOTE_PRODUCTION_ENABLED = false;
 export class TransportFailure extends Error {
@@ -70,6 +71,7 @@ export class MockRemoteCoordinator {
     )
       return Promise.reject(new Error('Mock queue unavailable'));
     if (
+      !validUnit({ ...input.unit, id: '', parentId: null }) ||
       Object.keys(input.unit).some(
         (field) =>
           ![

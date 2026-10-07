@@ -8,7 +8,7 @@ The scorer receives one authored unit with bounded parent, root and quote contex
 
 Features combine generic engagement, formulaic structure, parent overlap, diversity and specificity. Fewer than eight tokens, unsupported language signals and articles over 8,000 characters abstain. Short results are capped at 0.79 and other heuristic results at 0.84. Grammar, polished writing, slang, em dashes and non-native English are not reliable authorship evidence.
 
-The optional Chrome model runs on-device, after explicit preparation. Articles eligible for model refinement use five deterministic chunks of at most 1,200 characters, require three valid chunk results and aggregate a median with bounded repetition. Social batches take priority. Disagreement lowers evidence and never authorizes automatic hiding. Articles beyond the alpha's local eligibility limit still abstain; chunking is not permission to bypass that gate.
+The optional Chrome model runs on-device, after explicit preparation. Articles eligible for model refinement use five deterministic chunks of at most 1,200 characters, require three valid chunk results and aggregate a median with bounded repetition. Articles shorter than 3,600 characters keep local results without a model call, rather than bypassing the three-chunk requirement. Social batches take priority. Disagreement lowers evidence and never authorizes automatic hiding. Articles beyond the alpha's local eligibility limit still abstain; chunking is not permission to bypass that gate.
 
 ## Evaluation and experimental training
 

@@ -43,4 +43,10 @@ test('circular or oversized untrusted requests are rejected without throwing', (
       settings: { text: 'x'.repeat(256_001) },
     }),
   ).toBeNull();
+  expect(
+    parseRequest({
+      type: 'SETTINGS_SET',
+      settings: { text: '界'.repeat(100_000) },
+    }),
+  ).toBeNull();
 });

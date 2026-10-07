@@ -14,6 +14,19 @@ test('private routes are excluded across every adapter', () => {
     expect(
       adapter.matches(new URL(`${origins[adapter.platform]}/messages/inbox`)),
     ).toBe(false);
+    for (const path of [
+      '/i/chat',
+      '/i/communities/invented',
+      '/groups/invented',
+      '/mod/invented/review',
+    ])
+      expect(
+        adapter.matches(new URL(`${origins[adapter.platform]}${path}`)),
+      ).toBe(false);
+    if (adapter.platform === 'linkedin')
+      expect(adapter.matches(new URL('https://www.linkedin.com/jobs/'))).toBe(
+        false,
+      );
   }
 });
 test('YouTube video changes are separate route sessions', () => {

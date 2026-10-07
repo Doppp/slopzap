@@ -87,6 +87,21 @@ test('unavailable on-device model never triggers a download', async () => {
     ),
   ).toEqual([]);
   expect(api.create).not.toHaveBeenCalled();
+  const available: ModelFactory = {
+    ...api,
+    availability: vi.fn().mockResolvedValue('available'),
+  };
+  const shortArticle = {
+    ...inputs[0]!,
+    unit: { ...inputs[0]!.unit, kind: 'article' as const },
+  };
+  expect(
+    await new ChromePromptProvider(available).classify(
+      [shortArticle],
+      new AbortController().signal,
+    ),
+  ).toEqual([]);
+  expect(available.create).not.toHaveBeenCalled();
 });
 test('provider disagreement never authorizes automatic hiding', () => {
   const local = classify(

@@ -95,15 +95,20 @@ export class ChromePromptProvider implements Provider {
     if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
     if (!(await abortable(this.ready(), signal)) || inputs.length > 12)
       return [];
+    const eligible = inputs.filter(
+      (input) =>
+        input.unit.kind !== 'article' || input.unit.text.length >= 3600,
+    );
+    if (!eligible.length) return [];
     const articles = new Map(
-      inputs
+      eligible
         .filter(
           (input) =>
             input.unit.kind === 'article' && input.unit.text.length >= 3600,
         )
         .map((input) => [input.id, articleChunks(input)]),
     );
-    const expanded = inputs.flatMap(
+    const expanded = eligible.flatMap(
       (input) => articles.get(input.id) ?? [input],
     );
     if (expanded.length > 12) return [];
@@ -144,13 +149,14 @@ export class ChromePromptProvider implements Provider {
       });
     } finally {
       clone.destroy();
-      this.idleTimer = setTimeout(() => {
-        if (this.session)
-          void this.session
-            .then((session) => session.destroy())
-            .catch(() => {});
-        this.session = undefined;
-      }, 60_000);
+      if (!this.disposed)
+        this.idleTimer = setTimeout(() => {
+          if (this.session)
+            void this.session
+              .then((session) => session.destroy())
+              .catch(() => {});
+          this.session = undefined;
+        }, 60_000);
     }
   }
   close(): void {

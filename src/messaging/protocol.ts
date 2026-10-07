@@ -54,7 +54,8 @@ export function validResult(value: unknown): value is Result {
 export function parseRequest(value: unknown): Request | null {
   if (!value || typeof value !== 'object') return null;
   try {
-    if (JSON.stringify(value).length > 256_000) return null;
+    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 256_000)
+      return null;
   } catch {
     return null;
   }

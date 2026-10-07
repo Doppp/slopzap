@@ -4,7 +4,12 @@ import type { Kind, Platform } from '../shared/types';
 export const SENSITIVE =
   'input,textarea,form,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[data-sz-private],[data-slopzap-ui]';
 export function sensitiveRoute(url: URL): boolean {
-  return /\/(messaging|message|messages|i\/chat|chat|direct|inbox|compose|drafts|settings|notifications|groups)(\/|$)/i.test(
+  if (
+    url.hostname === 'www.linkedin.com' &&
+    /^\/jobs(\/|$)/i.test(url.pathname)
+  )
+    return true;
+  return /\/(messaging|message|messages|i\/chat|i\/communities|communities|chat|direct|inbox|compose|drafts|settings|notifications|groups|mod)(\/|$)/i.test(
     url.pathname,
   );
 }
