@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { corpus, type Example } from '../evaluation/schema';
 import { metrics, ranking, confidence } from '../evaluation/metrics';
 import { report } from '../evaluation/report';
-import { train, score } from '../evaluation/model';
+import { train, score, parseModel, FEATURE_NAMES } from '../evaluation/model';
 const example = (id = 'one'): Example => ({
   id,
   splitGroup: id,
@@ -74,6 +74,7 @@ test('abstentions count as missed positives and are explicit in coverage', () =>
   });
 });
 test('ranking handles tied scores and exposes empty calibration', () => {
+  expect(() => ranking([{ label: 1, score: NaN, group: 'one' }])).toThrow();
   expect(
     ranking([
       { label: 1, score: 1, group: 'one' },
@@ -84,6 +85,24 @@ test('ranking handles tied scores and exposes empty calibration', () => {
     prAuc: null,
     calibrationErrorClassified: null,
   });
+});
+test('experimental model parsing rejects overflow-prone weights and undeclared fields', () => {
+  const model = {
+    version: 'experimental-logistic-v1',
+    features: [...FEATURE_NAMES],
+    weights: FEATURE_NAMES.map(() => 0),
+    calibration: [0, 1],
+    trainSamples: 20,
+    validationSamples: 20,
+    automaticHide: false,
+  };
+  expect(parseModel(model)).toEqual(model);
+  expect(() =>
+    parseModel({ ...model, weights: FEATURE_NAMES.map(() => 1e308) }),
+  ).toThrow();
+  expect(() =>
+    parseModel({ ...model, text: 'must not enter an exported model' }),
+  ).toThrow();
 });
 test('bootstrap is reproducible and zero observed FPs still have an uncertainty bound', () => {
   const rows = Array.from({ length: 60 }, (_, index) => ({

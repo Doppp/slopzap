@@ -34,6 +34,14 @@ export function metrics(rows: Prediction[], threshold: number) {
   };
 }
 export function ranking(rows: Prediction[]) {
+  if (
+    rows.some(
+      (row) =>
+        row.score !== null &&
+        (!Number.isFinite(row.score) || row.score < 0 || row.score > 1),
+    )
+  )
+    throw new Error('Invalid prediction score');
   const positives = rows.filter((row) => row.label).length;
   const sorted = [...rows].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
   let tp = 0,

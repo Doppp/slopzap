@@ -108,14 +108,34 @@ export function parseModel(value: unknown): Model {
   const model = value as Model;
   if (
     !model ||
+    Object.keys(model).some(
+      (key) =>
+        ![
+          'version',
+          'features',
+          'weights',
+          'calibration',
+          'trainSamples',
+          'validationSamples',
+          'automaticHide',
+        ].includes(key),
+    ) ||
     model.version !== 'experimental-logistic-v1' ||
     JSON.stringify(model.features) !== JSON.stringify(FEATURE_NAMES) ||
     !Array.isArray(model.weights) ||
     model.weights.length !== FEATURE_NAMES.length ||
-    !model.weights.every(Number.isFinite) ||
+    !model.weights.every(
+      (value) => Number.isFinite(value) && Math.abs(value) <= 1000,
+    ) ||
     !Array.isArray(model.calibration) ||
     model.calibration.length !== 2 ||
-    !model.calibration.every(Number.isFinite) ||
+    !model.calibration.every(
+      (value) => Number.isFinite(value) && Math.abs(value) <= 1000,
+    ) ||
+    !Number.isInteger(model.trainSamples) ||
+    model.trainSamples < 20 ||
+    !Number.isInteger(model.validationSamples) ||
+    model.validationSamples < 20 ||
     model.automaticHide !== false
   )
     throw new Error('Invalid experimental model');
