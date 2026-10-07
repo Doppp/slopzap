@@ -241,3 +241,17 @@ test('synthetic feed supports contributors without live accounts', async () => {
   await page.getByRole('button', { name: 'Remove feed', exact: true }).click();
   await expect.poll(async () => (await snapshot()).stats.bound).toBe(0);
 });
+
+test('mode changes preserve content collapsed by the host website', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const body = page.locator(
+    'shreddit-comment[thingid="reply-1"] [slot="comment"]',
+  );
+  await body.evaluate((node) => {
+    (node as HTMLElement).hidden = true;
+  });
+  await mode('Normal');
+  await expect(body).toBeHidden();
+  await mode('Slop Goggles');
+  await expect(body).toBeHidden();
+});

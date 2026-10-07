@@ -20,9 +20,10 @@ export class Renderer {
     verdict: Verdict | undefined,
   ): void {
     this.removeUi();
-    this.binding.body.hidden = this.originalHidden;
+    if (this.hidden) this.binding.body.hidden = this.originalHidden;
+    else this.originalHidden = this.binding.body.hidden;
     this.hidden = false;
-    if (mode === 'normal' || !result) return;
+    if (mode === 'normal' || !result || this.binding.body.hidden) return;
     // Hiding a body containing descendants would orphan the branch. Annotate instead.
     if (
       this.binding.body.querySelector(
