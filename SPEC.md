@@ -2,6 +2,8 @@
 
 Status: implementation-ready draft
 
+Implementation note (2026-10-07): the repository now contains a development alpha. Section 42 records decisions verified during implementation and takes precedence over conflicting original design details below. Public-release classification and live-platform validation gates remain unmet.
+
 Target: Chrome Manifest V3, desktop
 
 Last verified: 2026-10-07
@@ -1094,3 +1096,33 @@ Capabilities below were verified on 2026-10-07. “Stable” means documented as
 | Tooling | WXT currently generates MV3 manifests/builds across browser targets; retain a thin dependency boundary | [WXT](https://wxt.dev/), [manifest generation](https://wxt.dev/guide/essentials/config/manifest) |
 
 Reverify every external capability and policy immediately before implementing its milestone and before Store submission. Source dates are evidence snapshots, not permanent guarantees.
+
+## 42. Decisions verified during implementation
+
+### 42.1 Local computation context
+
+The Chromium extension E2E test demonstrated that direct `new Worker(chrome.runtime.getURL(...))` from the content script fails at the browser origin boundary. The alpha therefore runs the small local feature scorer in the existing MV3 service worker through validated batches of up to 16 items. This remains off the host page's main thread and needs no page-accessible worker resource, offscreen document or extra permission. This supersedes the worker placement, diagram and resource recommendation in §9, §12 and §33. Keep the service worker disposable; no inference promise or in-memory cache is authoritative.
+
+### 42.2 Fingerprint serialization and contextual edits
+
+Use deterministic `JSON.stringify` of an ordered field array encoded as UTF-8, with prefix `slopzap-fp-v2`, platform, kind, stable ID, parent ID, route, normalized target, normalized parent, normalized root, and normalized quote context. SHA-256 hashes this byte sequence. Context is included because editing a parent must invalidate a child's contextual result. This supersedes the target-only/null-separated formula in §16. Store the hash and derived result, not the input array. YouTube's validated video query parameter forms part of the route key; unrelated query parameters do not.
+
+### 42.3 Alpha scorer and release gate
+
+The implemented scorer is a transparent, untrained feature heuristic combining graded engagement/structure signals, stop-word-filtered contextual overlap, lexical diversity and specificity safeguards. It is not the trained production model proposed in §9.4. It abstains for fewer than eight tokens, unsupported script/language signals and articles longer than 8,000 extracted characters. All results retain `automaticHide:false`, including Chrome Prompt results. Blocker can hide locally corrected items; it cannot hide based on an unvalidated detector. Slop Only/Goggles expose provisional scores. The 24-example invented development seed supports iteration, not an accuracy claim or public-release gate. Preserve the independent evaluation requirements in §29.
+
+### 42.4 Cache and runtime bounds
+
+The implemented IndexedDB schema is version 2, with result/override stores indexed by access time and expiry. Results are bounded at 20,000 records and overrides at 5,000; each trims to 80% when exceeded. Local/insufficient/override TTLs remain 90/7/365 days. Chrome model scores expire after one day because Chrome's model can change without a stable snapshot identifier. Enforce expiry on read and prune during writes. This supersedes the original schema/count/provider TTL choices in §17.
+
+Discovery traverses at most 200 nodes or five milliseconds per slice; two IntersectionObservers distinguish visible and near-visible units. Observation registrations are capped at 1,000. Bindings beyond 300 are trimmed toward 250, excluding currently eligible items. Throttled viewport sampling can rediscover evicted items. The route aggregate retains at most 10,000 derived results and releases all DOM/text bindings on removal/navigation. These measured implementation defaults replace the proposed 100-registration limit in §15. Full CPU/frame/30-minute profiling remains a release requirement.
+
+### 42.5 Optional model behavior
+
+Chrome model analysis runs in a document context, separately from the local queue, with at most 12 inputs per prompt, one prompt per tab and an eight-second abort deadline. Clone an unprompted base session per batch, validate the exact schema and destroy the clone. Destroy the base after 60 seconds idle. Model downloads require an explicit options-page action. User-facing local results render before model work. The actual hardware/model path remains capability-dependent and is tested with mocks until real-device verification.
+
+### 42.6 Developer testing and public-release readiness
+
+The packaged synthetic feed is an extension page, accessible from Settings, with invented nested comments, batch insertion, removal and route changes. It requires no platform account or additional host match. Automated Chromium tests cover all five invented adapter fixtures, context preservation, excluded composers, edits, route cleanup, 1,000 loaded comments, cache reuse, zero-inference mode switching, removal cleanup and accessibility.
+
+These tests establish an installable development alpha. They do not establish live-site compatibility, scientific detection accuracy, or the reference-machine performance budgets. Keep the release draft until dated live smoke checks, independent corpus gates and extended profiling pass. OpenAI sign-in/remote inference remains absent pending §18.2's official-auth compatibility gate.
