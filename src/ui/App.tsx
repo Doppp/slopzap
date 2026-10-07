@@ -246,6 +246,15 @@ export function App({ options = false }: { options?: boolean }) {
               excluded.
             </p>
             <div className="actions">
+              <button
+                onClick={() =>
+                  void browser.tabs.create({
+                    url: browser.runtime.getURL('/harness.html'),
+                  })
+                }
+              >
+                Open synthetic test feed
+              </button>
               <button onClick={() => void clear('results')}>
                 Clear score cache
               </button>

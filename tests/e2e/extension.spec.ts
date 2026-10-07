@@ -51,6 +51,44 @@ async function mode(value: string) {
   ).toHaveAttribute('aria-pressed', 'true');
   await options.close();
 }
+async function snapshot(): Promise<{
+  stats: { classifications: number; candidates: number; bound: number };
+  aggregate: { analysed: number };
+}> {
+  return context.serviceWorkers()[0]!.evaluate(async () => {
+    const chrome = (
+      globalThis as unknown as {
+        chrome: {
+          tabs: {
+            query(options: object): Promise<{ id?: number }[]>;
+            sendMessage(id: number, message: object): Promise<unknown>;
+          };
+        };
+      }
+    ).chrome;
+    for (const tab of await chrome.tabs.query({}))
+      if (tab.id) {
+        try {
+          const result = await chrome.tabs.sendMessage(tab.id, {
+            type: 'SNAPSHOT',
+          });
+          if (
+            result &&
+            typeof result === 'object' &&
+            'supported' in result &&
+            result.supported
+          )
+            return result;
+        } catch {
+          /* tabs without SlopZap */
+        }
+      }
+    throw new Error('No active SlopZap route');
+  }) as unknown as Promise<{
+    stats: { classifications: number; candidates: number; bound: number };
+    aggregate: { analysed: number };
+  }>;
+}
 test('classifies separate replies, preserves context, reveals and restores', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   await expect(page.locator('form [data-slopzap-ui]')).toHaveCount(0);
@@ -172,6 +210,34 @@ test('settings controls are accessible and local-only behavior needs no provider
   ).toBeEnabled();
   const result = await new AxeBuilder({ page: options }).analyze();
   expect(result.violations).toEqual([]);
+  await options.screenshot({
+    path: 'test-results/options.png',
+    fullPage: true,
+  });
   await options.getByRole('button', { name: 'Clear score cache' }).click();
   await expect(options.getByRole('status')).toContainText('Cache cleared');
+});
+
+test('mode switches and a reload reuse cached scores without inference', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const before = (await snapshot()).stats.classifications;
+  for (const value of ['Slop Blocker', 'Slop Only', 'Normal', 'Slop Goggles'])
+    await mode(value);
+  expect((await snapshot()).stats.classifications).toBe(before);
+  await page.reload();
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  expect((await snapshot()).stats.classifications).toBe(0);
+});
+
+test('synthetic feed supports contributors without live accounts', async () => {
+  await page.goto(`chrome-extension://${extensionId}/harness.html`);
+  await expect
+    .poll(() => page.locator('[data-slopzap-ui]').count())
+    .toBeGreaterThan(1);
+  await page.getByRole('button', { name: 'Add 100 comments' }).click();
+  expect(await page.locator('[data-sz-unit]').count()).toBeGreaterThan(100);
+  const stats = (await snapshot()).stats;
+  expect(stats.classifications).toBeLessThan(40);
+  await page.getByRole('button', { name: 'Remove feed', exact: true }).click();
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(0);
 });

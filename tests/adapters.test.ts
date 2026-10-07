@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { adapters, adapterFor } from '../src/adapters';
 test('private routes are excluded across every adapter', () => {
   for (const adapter of adapters) {
+    if (adapter.platform === 'synthetic') continue;
     const origins = {
       reddit: 'https://www.reddit.com',
       youtube: 'https://www.youtube.com',
