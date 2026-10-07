@@ -573,6 +573,199 @@ test('model preparation shows progress and can be cancelled without enabling a p
   ).toBeEnabled();
 });
 
+test('reference comparison never downloads a model or infers while rendering', async () => {
+  const comparison = await context.newPage();
+  await comparison.addInitScript(() => {
+    Object.assign(globalThis, { comparisonCreates: 0 });
+    Object.defineProperty(globalThis, 'LanguageModel', {
+      value: {
+        availability: async () => 'downloadable',
+        create: async () => {
+          (globalThis as unknown as { comparisonCreates: number })
+            .comparisonCreates++;
+          return {};
+        },
+      },
+    });
+  });
+  await comparison.goto(`chrome-extension://${extensionId}/comparison.html`);
+  await expect(
+    comparison.getByText('Model availability: downloadable'),
+  ).toBeVisible();
+  await expect(
+    comparison.getByRole('button', { name: 'Run paired comparison' }),
+  ).toBeDisabled();
+  await comparison.getByText('Review the 12 invented examples').click();
+  await expect(comparison.locator('article')).toHaveCount(12);
+  expect(
+    await comparison.evaluate(
+      () =>
+        (globalThis as unknown as { comparisonCreates: number })
+          .comparisonCreates,
+    ),
+  ).toBe(0);
+  expect(
+    (await new AxeBuilder({ page: comparison }).analyze()).violations,
+  ).toEqual([]);
+});
+
+test('paired comparison exports only numeric results and leaves preferences unchanged', async () => {
+  const comparison = await context.newPage();
+  await comparison.addInitScript(() => {
+    const counters = { creates: 0, destroys: 0, prompts: 0, guided: 0 };
+    Object.assign(globalThis, { comparisonCounters: counters });
+    Object.defineProperty(globalThis, 'LanguageModel', {
+      value: {
+        availability: async () => 'available',
+        create: async () => {
+          counters.creates++;
+          return {
+            destroy: () => counters.destroys++,
+            clone: async () => ({
+              destroy: () => counters.destroys++,
+              prompt: async (input: string) => {
+                counters.prompts++;
+                const data = JSON.parse(input);
+                if (data.referenceGuide) counters.guided++;
+                return JSON.stringify({
+                  results: [
+                    {
+                      id: data.items[0].id,
+                      score: data.referenceGuide ? 0.75 : 0.5,
+                      evidence: 0.9,
+                      reasons: [],
+                    },
+                  ],
+                });
+              },
+            }),
+          };
+        },
+      },
+    });
+  });
+  await comparison.goto(`chrome-extension://${extensionId}/comparison.html`);
+  const before = await comparison.evaluate(async () =>
+    (
+      globalThis as unknown as {
+        chrome: { runtime: { sendMessage(input: object): Promise<unknown> } };
+      }
+    ).chrome.runtime.sendMessage({ type: 'SETTINGS_GET' }),
+  );
+  await expect(
+    comparison.getByRole('button', { name: 'Run paired comparison' }),
+  ).toBeEnabled();
+  await comparison
+    .getByRole('button', { name: 'Run paired comparison' })
+    .evaluate((button) => (button as HTMLElement).click());
+  expect(
+    await comparison.evaluate(
+      () =>
+        (globalThis as unknown as { comparisonCounters: { creates: number } })
+          .comparisonCounters.creates,
+    ),
+  ).toBe(0);
+  await comparison
+    .getByRole('button', { name: 'Run paired comparison' })
+    .click();
+  await expect(comparison.getByRole('status')).toContainText(
+    'Comparison complete · 12 of 12 valid pairs',
+  );
+  expect(
+    await comparison.evaluate(
+      () =>
+        (globalThis as unknown as { comparisonCounters: object })
+          .comparisonCounters,
+    ),
+  ).toEqual({ creates: 24, destroys: 48, prompts: 24, guided: 12 });
+  const after = await comparison.evaluate(async () =>
+    (
+      globalThis as unknown as {
+        chrome: { runtime: { sendMessage(input: object): Promise<unknown> } };
+      }
+    ).chrome.runtime.sendMessage({ type: 'SETTINGS_GET' }),
+  );
+  expect(after).toEqual(before);
+  const download = comparison.waitForEvent('download');
+  await comparison
+    .getByRole('button', { name: 'Export numeric comparison' })
+    .click();
+  const report = JSON.parse(
+    await readFile((await (await download).path())!, 'utf8'),
+  );
+  expect(report.releaseReady).toBe(false);
+  expect(report.automaticHide).toBe(false);
+  expect(report.pairedCases).toBe(12);
+  expect(JSON.stringify(report)).not.toMatch(
+    /parentText|quotedText|bicycle|opening time|referenceGuide|fingerprint|https:\/\//,
+  );
+  expect(
+    (await new AxeBuilder({ page: comparison }).analyze()).violations,
+  ).toEqual([]);
+  await comparison.screenshot({
+    path: 'test-results/reference-comparison.png',
+    fullPage: true,
+  });
+});
+
+test('cancelling a stuck comparison releases sessions and reports incomplete evidence', async () => {
+  const comparison = await context.newPage();
+  await comparison.addInitScript(() => {
+    const counters = { creates: 0, destroys: 0 };
+    Object.assign(globalThis, { comparisonCounters: counters });
+    Object.defineProperty(globalThis, 'LanguageModel', {
+      value: {
+        availability: async () => 'available',
+        create: async () => {
+          counters.creates++;
+          return {
+            destroy: () => counters.destroys++,
+            clone: async () => ({
+              destroy: () => counters.destroys++,
+              prompt: async () => new Promise(() => {}),
+            }),
+          };
+        },
+      },
+    });
+  });
+  await comparison.goto(`chrome-extension://${extensionId}/comparison.html`);
+  await expect(
+    comparison.getByRole('button', { name: 'Run paired comparison' }),
+  ).toBeEnabled();
+  await comparison
+    .getByRole('button', { name: 'Run paired comparison' })
+    .click();
+  await expect
+    .poll(() =>
+      comparison.evaluate(
+        () =>
+          (globalThis as unknown as { comparisonCounters: { creates: number } })
+            .comparisonCounters.creates,
+      ),
+    )
+    .toBe(1);
+  await comparison.getByRole('button', { name: 'Cancel comparison' }).click();
+  await expect(comparison.getByRole('status')).toContainText(
+    'Comparison cancelled · 0 of 12 valid pairs',
+  );
+  await expect
+    .poll(() =>
+      comparison.evaluate(
+        () =>
+          (
+            globalThis as unknown as {
+              comparisonCounters: { destroys: number };
+            }
+          ).comparisonCounters.destroys,
+      ),
+    )
+    .toBe(2);
+  await expect(
+    comparison.getByRole('button', { name: 'Run paired comparison' }),
+  ).toBeEnabled();
+});
+
 test('injected keyboard feedback retains focus; forced colors and enlarged UI stay accessible', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const reply = page.locator('shreddit-comment[thingid="reply-1"]');

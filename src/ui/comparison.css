@@ -1,0 +1,46 @@
+.comparison {
+  width: min(940px, 100%);
+}
+.comparison progress {
+  width: 100%;
+  margin-top: 12px;
+}
+.table-scroll {
+  overflow-x: auto;
+  margin: 20px 0;
+}
+.table-scroll:focus-visible {
+  outline: 2px solid #ffd065;
+  outline-offset: 3px;
+}
+.comparison table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.comparison caption {
+  text-align: left;
+  padding: 8px 0;
+  font-weight: 700;
+}
+.comparison th,
+.comparison td {
+  text-align: left;
+  border: 1px solid #465154;
+  padding: 8px;
+}
+.comparison details {
+  margin-top: 24px;
+}
+.comparison summary {
+  cursor: pointer;
+}
+.comparison article {
+  padding-top: 12px;
+  border-top: 1px solid #465154;
+}
+@media (forced-colors: active) {
+  .comparison th,
+  .comparison td {
+    border-color: CanvasText;
+  }
+}

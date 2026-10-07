@@ -433,6 +433,19 @@ export function App({ options = false }: { options?: boolean }) {
             <button onClick={() => void exportDiagnostics()}>
               Export local diagnostics
             </button>
+            <p>
+              Developer experiment: compare the reference guide using invented
+              examples, without reading open tabs or changing preferences.
+            </p>
+            <button
+              onClick={() =>
+                void browser.tabs.create({
+                  url: browser.runtime.getURL('/comparison.html'),
+                })
+              }
+            >
+              Open reference comparison
+            </button>
           </section>
           <section>
             <h2>Your data stays here</h2>
