@@ -3,7 +3,24 @@
   "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 61, "chromium": 33 },
+  "automatedTests": { "unit": 68, "chromium": 36 },
+  "pairedComparison": {
+    "inventedCases": 12,
+    "alternatingArmOrder": true,
+    "freshSessions": true,
+    "perArmDeadlineMs": 8000,
+    "numericExportAndCancellationRegressionsPassed": true,
+    "modelResponsesInBrowserTests": "mocked",
+    "realModelComparisonCompleted": false
+  },
+  "isolatedWebCapabilityProbe": {
+    "scope": "disposable headless empty loopback web page; not extension or hardware acceptance",
+    "chromeVersion": "155.0.8059.40",
+    "apiPresent": true,
+    "availability": "unavailable",
+    "modelCreationRequested": false,
+    "downloadRequested": false
+  },
   "referenceGuidance": {
     "version": "reference-guide-v1",
     "inventedPairs": 5,
@@ -30,12 +47,12 @@
   },
   "packagedFileReproducibility": {
     "passed": true,
-    "files": 22,
+    "files": 28,
     "zipByteEqualityClaimed": false
   },
   "shortBenchmark": {
-    "scope": "reference-guidance build; short regression checks, not reference-hardware acceptance",
-    "sourceReport": "2026-10-07T16-09-17-120Z.json",
+    "scope": "paired-comparison development build; short regression checks, not reference-hardware acceptance",
+    "sourceReport": "2026-10-07T17-39-53-424Z.json",
     "scenarios": 12,
     "units": [100, 500, 1000],
     "cpuRates": [1, 4],

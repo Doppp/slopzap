@@ -4,6 +4,8 @@ import {
   downloadModel,
   type ModelFactory,
   type ModelSession,
+  BASELINE_INSTRUCTIONS,
+  INSTRUCTIONS,
 } from '../src/providers/chrome-prompt';
 import { validateOutput, type ProviderInput } from '../src/providers/types';
 import { compose } from '../src/providers/compose';
@@ -48,6 +50,38 @@ test('schema validation rejects arbitrary IDs, prose, extra fields and out-of-ra
   expect(() =>
     validateOutput({ results: [result], prose: 'untrusted' }, inputs),
   ).toThrow();
+});
+test('comparison baseline removes references without changing common classification policy', async () => {
+  const prompt = vi.fn(async (input: string) => {
+    const value = JSON.parse(input);
+    expect(value).not.toHaveProperty('referenceGuide');
+    expect(value.items).toEqual(inputs);
+    return JSON.stringify({
+      results: [{ id: 'one', score: 0.5, evidence: 0.8, reasons: [] }],
+    });
+  });
+  const clone = { clone: vi.fn(), prompt, destroy: vi.fn() };
+  const create = vi.fn(async () => ({
+    clone: vi.fn(async () => clone),
+    prompt: vi.fn(),
+    destroy: vi.fn(),
+  }));
+  const provider = new ChromePromptProvider(
+    { availability: vi.fn(async () => 'available'), create },
+    false,
+  );
+  try {
+    await provider.classify(inputs, new AbortController().signal);
+  } finally {
+    provider.close();
+  }
+  expect(create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      initialPrompts: [{ role: 'system', content: BASELINE_INSTRUCTIONS }],
+    }),
+  );
+  expect(BASELINE_INSTRUCTIONS).not.toContain('referenceGuide');
+  expect(INSTRUCTIONS).toContain('referenceGuide');
 });
 test('each batch uses a fresh cloned session and destroys it', async () => {
   const destroy = vi.fn();
