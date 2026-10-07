@@ -64,6 +64,8 @@ The extension installs disabled for remote transmission and enabled locally on t
 
 Default mode is **Slop Goggles** for the first session because it exposes mistakes without hiding content. The user may select Blocker as the persistent default.
 
+Implemented onboarding: `onboarding.html` opens automatically on a fresh `runtime.onInstalled` installation event. It presents score/privacy guidance, a default-view choice, and five site toggles, followed by an optional demo handoff. A durable local presentation flag prevents repeated automatic opening; completion is stored with the selected view/sites. Updates and browser restarts never reset preferences or auto-open setup. Closing unfinished setup leaves a popup reminder. Settings includes manual review. Users may keep current defaults or disable every site; provider/global-enable/threshold settings are preserved. Setup performs no model downloads and adds no permissions.
+
 ### 5.2 Modes
 
 `normal` removes all SlopZap presentation but may continue classification according to the current scheduler; it is an explicit fifth internal state. Mode switching re-renders existing results synchronously and causes zero new inference.
