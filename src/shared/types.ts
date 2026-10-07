@@ -9,6 +9,7 @@ export type Kind =
   | 'article'
   | 'article_response';
 export interface Settings {
+  onDevice: boolean;
   enabled: boolean;
   mode: Mode;
   blockerThreshold: number;
@@ -16,6 +17,7 @@ export interface Settings {
   sites: Record<Exclude<Platform, 'synthetic'>, boolean>;
 }
 export const DEFAULT_SETTINGS: Settings = {
+  onDevice: false,
   enabled: true,
   mode: 'goggles',
   blockerThreshold: 0.85,
@@ -48,7 +50,7 @@ export interface Snapshot {
   corrected: number;
 }
 export type Verdict = 'not_slop' | 'slop';
-export const CLASSIFIER_VERSION = 'provisional-features-v1';
+export const CLASSIFIER_VERSION = 'provisional-features-v2';
 export function parseSettings(value: unknown): Settings {
   const input =
     value && typeof value === 'object' ? (value as Partial<Settings>) : {};
@@ -57,6 +59,7 @@ export function parseSettings(value: unknown): Settings {
       ? Math.min(0.95, Math.max(minimum, n))
       : fallback;
   return {
+    onDevice: input.onDevice === true,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : true,
     mode: ['normal', 'blocker', 'only', 'goggles'].includes(input.mode ?? '')
       ? input.mode!

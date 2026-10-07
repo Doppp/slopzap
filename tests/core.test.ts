@@ -13,6 +13,28 @@ const unit: Unit = {
   rootText: '',
   quotedText: '',
 };
+test('specific contributions score below interchangeable paraphrasing', () => {
+  const parentText =
+    'The real challenge is having the right processes in place.';
+  const generic = classify(
+    {
+      ...unit,
+      parentText,
+      text: 'Absolutely. The real challenge is having the right processes in place. Great insight and thank you for sharing this valuable perspective!',
+    },
+    'a',
+  );
+  const specific = classify(
+    {
+      ...unit,
+      parentText,
+      text: 'We measured review time before and after assigning a backup approver. It dropped from three days to one because handoffs improved.',
+    },
+    'b',
+  );
+  expect(generic.score).toBeGreaterThan(specific.score);
+  expect(generic.automaticHide).toBe(false);
+});
 describe('classification safety', () => {
   test('short comments abstain and heuristic results never auto-hide', () => {
     expect(classify({ ...unit, text: 'Great insight!' }, 'a').status).toBe(
