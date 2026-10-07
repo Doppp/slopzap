@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Invented X thread</title>
+  </head>
+  <body>
+    <main>
+      <article data-testid="tweet" data-tweet-id="quote">
+        <div data-testid="tweetText">
+          I tested this yesterday and the claimed latency improvement did not
+          reproduce.
+        </div>
+        <div data-testid="quoteTweet">
+          <article data-testid="tweet">
+            <div data-testid="tweetText">
+              This quoted source must not be classified as the quoting person's
+              own text.
+            </div>
+          </article>
+        </div>
+      </article>
+      <article data-testid="tweet" data-tweet-id="reply">
+        <div data-testid="tweetText">
+          Absolutely, great insight! Thank you for sharing this valuable
+          perspective.
+        </div>
+      </article>
+      <form>
+        <article data-testid="tweet">
+          <div data-testid="tweetText">
+            This private draft should be excluded from classification entirely.
+          </div>
+        </article>
+      </form>
+    </main>
+  </body>
+</html>
