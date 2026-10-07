@@ -11,6 +11,17 @@ if (
   throw new Error('Unexpected extension permissions');
 if (JSON.stringify(manifest).includes('<all_urls>'))
   throw new Error('Broad host permission');
+if (
+  manifest.optional_permissions?.length ||
+  manifest.optional_host_permissions?.length ||
+  manifest.externally_connectable
+)
+  throw new Error('Unexpected optional/external access');
+if (
+  manifest.content_security_policy?.extension_pages !==
+  "script-src 'self'; object-src 'none';"
+)
+  throw new Error('Unexpected extension CSP');
 const allowed = new Set([
   'https://www.reddit.com/*',
   'https://www.youtube.com/*',
@@ -20,7 +31,13 @@ const allowed = new Set([
   'https://medium.com/*',
 ]);
 for (const script of manifest.content_scripts ?? []) {
-  if (script.matches.some((match) => !allowed.has(match)) || script.all_frames)
+  if (
+    script.matches.some((match) => !allowed.has(match)) ||
+    script.all_frames ||
+    script.match_about_blank ||
+    script.match_origin_as_fallback ||
+    (script.world && script.world !== 'ISOLATED')
+  )
     throw new Error('Unexpected content-script access');
 }
 if (

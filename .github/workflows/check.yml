@@ -18,6 +18,8 @@ jobs:
       - run: pnpm eval
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      - run: pnpm benchmark --duration=1
+      - run: pnpm reproducibility
       - run: pnpm zip
       - uses: actions/upload-artifact@v4
         with:
@@ -30,3 +32,11 @@ jobs:
         with:
           name: browser-test-results
           path: test-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: milestone-verification
+          path: |
+            .output/benchmarks
+            .output/verification
+          include-hidden-files: true
