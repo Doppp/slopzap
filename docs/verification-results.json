@@ -1,9 +1,27 @@
 {
   "schemaVersion": 1,
-  "date": "2026-10-07",
+  "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 55, "chromium": 32 },
+  "automatedTests": { "unit": 61, "chromium": 33 },
+  "referenceGuidance": {
+    "version": "reference-guide-v1",
+    "inventedPairs": 5,
+    "maxRetrievedPairs": 2,
+    "maxReferenceCharacters": 4000,
+    "savedLiveComments": 0,
+    "onDeviceQualityImprovementVerified": false,
+    "automaticHide": false,
+    "developmentSeed": {
+      "samples": 24,
+      "threshold": 0.7,
+      "tp": 2,
+      "fp": 0,
+      "tn": 15,
+      "fn": 7,
+      "abstained": 5
+    }
+  },
   "messageAndCacheHardening": {
     "malformedMessageRegressionsPassed": true,
     "corruptCacheRegressionsPassed": true,
@@ -16,7 +34,8 @@
     "zipByteEqualityClaimed": false
   },
   "shortBenchmark": {
-    "scope": "prior milestone build; not final-head reference acceptance",
+    "scope": "reference-guidance build; short regression checks, not reference-hardware acceptance",
+    "sourceReport": "2026-10-07T16-09-17-120Z.json",
     "scenarios": 12,
     "units": [100, 500, 1000],
     "cpuRates": [1, 4],
