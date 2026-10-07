@@ -79,7 +79,9 @@ export class Renderer {
     button.type = 'button';
     button.textContent = label;
     button.setAttribute('aria-label', `SlopZap: ${label}`);
-    button.addEventListener('click', click);
+    button.addEventListener('click', (event) => {
+      if (event.isTrusted) click();
+    });
     return button;
   }
   private removeUi(): void {
