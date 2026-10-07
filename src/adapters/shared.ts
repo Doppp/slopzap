@@ -4,6 +4,14 @@ import type { Kind, Platform } from '../shared/types';
 export const SENSITIVE =
   'input,textarea,form,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[data-sz-private],[data-slopzap-ui]';
 export function sensitiveRoute(url: URL): boolean {
+  // Authentication and access-challenge pages are not discussion surfaces.
+  // Anchor known route prefixes so public threads about sign-in stay eligible.
+  if (
+    /^\/(login|signin|sign-in|signup|sign-up|authwall|challenge|checkpoint|uas\/(login|signup)|i\/flow\/(login|signup)|account\/(login|signin)|m\/(signin|signup))(\/|$)/i.test(
+      url.pathname,
+    )
+  )
+    return true;
   if (
     url.hostname === 'www.linkedin.com' &&
     /^\/jobs(\/|$)/i.test(url.pathname)

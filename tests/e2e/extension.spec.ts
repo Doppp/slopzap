@@ -62,12 +62,12 @@ async function mode(value: string) {
   ).toHaveAttribute('aria-pressed', 'true');
   await options.close();
 }
-async function snapshot(): Promise<{
+async function snapshot(includeUnsupported = false): Promise<{
   stats: { classifications: number; candidates: number; bound: number };
   aggregate: { analysed: number; corrected: number };
   health: AdapterHealthSnapshot;
 }> {
-  return context.serviceWorkers()[0]!.evaluate(async () => {
+  return context.serviceWorkers()[0]!.evaluate(async (includeUnsupported) => {
     const chrome = (
       globalThis as unknown as {
         chrome: {
@@ -88,7 +88,7 @@ async function snapshot(): Promise<{
             result &&
             typeof result === 'object' &&
             'supported' in result &&
-            result.supported
+            (result.supported || includeUnsupported)
           )
             return result;
         } catch {
@@ -96,7 +96,7 @@ async function snapshot(): Promise<{
         }
       }
     throw new Error('No active SlopZap route');
-  }) as unknown as Promise<{
+  }, includeUnsupported) as unknown as Promise<{
     stats: { classifications: number; candidates: number; bound: number };
     aggregate: { analysed: number; corrected: number };
     health: AdapterHealthSnapshot;
@@ -379,6 +379,30 @@ for (const scenario of [
     await page.evaluate(() => history.pushState({}, '', '/messages/inbox'));
     await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
   });
+
+test('authentication routes restore content and stop classification; discussion navigation resumes', async () => {
+  const publicPath = '/r/slopzap/comments/invented/thread/';
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  await expect(reply.locator('[slot="comment"]')).toBeHidden();
+  for (const path of ['/login', '/authwall', '/checkpoint/challenge']) {
+    const before = (await snapshot()).stats.classifications;
+    await page.evaluate((path) => history.pushState({}, '', path), path);
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
+    await expect(reply.locator('[slot="comment"]')).toBeVisible();
+    const state = await snapshot(true);
+    expect(state.stats.bound).toBe(0);
+    expect(state.stats.candidates).toBe(0);
+    expect(state.stats.classifications).toBe(before);
+    await page.evaluate((path) => history.pushState({}, '', path), publicPath);
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+    await expect(reply.locator('[slot="comment"]')).toBeHidden();
+  }
+});
 
 test('deep Reddit branches preserve all ancestor context and release removed bindings', async () => {
   await page.evaluate(() => {

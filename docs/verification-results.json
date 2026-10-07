@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 72, "chromium": 37 },
+  "automatedTests": { "unit": 77, "chromium": 38 },
   "pairedComparison": {
     "inventedCases": 12,
     "alternatingArmOrder": true,
@@ -90,11 +90,17 @@
     "referenceHardwareAcceptance": false
   },
   "liveSmoke": {
-    "reddit": "HTTP 200, no target candidates; inconclusive",
+    "sourceReport": "docs/live-smoke-results-2026-10-08.json",
+    "chromeVersion": "155.0.8059.40",
+    "inventedControlInjectionVerified": true,
+    "inventedControlUnits": 3,
+    "authenticationRouteExclusionRegressionsPassed": true,
+    "liveAcceptance": false,
+    "reddit": "HTTP 200, possible challenge frame, zero target units; inconclusive",
     "youtube": "HTTP 200, no target candidates; inconclusive",
-    "linkedin": "authentication wall; not validated",
-    "x": "navigation unavailable; not validated",
-    "medium": "HTTP 403; not validated"
+    "linkedin": "HTTP 200, excluded authentication route, zero processing; not validated",
+    "x": "HTTP 200, no target units; inconclusive",
+    "medium": "HTTP 200, possible challenge frame, zero target units; inconclusive"
   },
   "onDeviceHardwareAcceptance": false,
   "installedChromeProbe": {
