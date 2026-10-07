@@ -61,6 +61,13 @@ header {
 .setup-reminder p {
   margin-top: 0;
 }
+.adapter-warning {
+  margin-bottom: 16px;
+}
+.adapter-warning h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
 .eyebrow {
   font-size: 11px;
   text-transform: uppercase;

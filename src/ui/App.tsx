@@ -9,15 +9,19 @@ import {
 import './styles.css';
 import { downloadModel } from '../providers/chrome-prompt';
 import { parseOnboarding } from '../state/onboarding';
+import type { AdapterHealthSnapshot } from '../content/adapter-health';
 
 interface PageState {
   supported: boolean;
   platform?: Platform;
   aggregate: Snapshot;
+  health?: AdapterHealthSnapshot;
 }
 export function App({ options = false }: { options?: boolean }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [page, setPage] = useState<PageState | null>(null);
+  const [pageTab, setPageTab] = useState<number | undefined>();
+  const [retrying, setRetrying] = useState(false);
   const [message, setMessage] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -45,10 +49,13 @@ export function App({ options = false }: { options?: boolean }) {
           active: true,
           currentWindow: true,
         });
-        if (tab?.id)
+        if (tab?.id) {
           setPage(await browser.tabs.sendMessage(tab.id, { type: 'SNAPSHOT' }));
+          setPageTab(tab.id);
+        }
       } catch {
         setPage(null);
+        setPageTab(undefined);
       }
     };
     if (!options) {
@@ -82,6 +89,26 @@ export function App({ options = false }: { options?: boolean }) {
     }
   };
   const score = page?.aggregate.score;
+  const retryAdapter = async () => {
+    setRetrying(true);
+    try {
+      if (!pageTab) throw new Error('No supported tab');
+      const result = await browser.tabs.sendMessage(pageTab, {
+        type: 'RETRY_ADAPTER',
+      });
+      if (!result?.ok) throw new Error('Route unavailable');
+      setPage(await browser.tabs.sendMessage(pageTab, { type: 'SNAPSHOT' }));
+      setMessage(
+        'Page check restarted. Content stays visible if parsing fails.',
+      );
+    } catch {
+      setMessage(
+        'Could not retry this page. Reload the discussion to try again.',
+      );
+    } finally {
+      setRetrying(false);
+    }
+  };
   const enableModel = async () => {
     setDownloading(true);
     setMessage('Preparing Chrome on-device AI. Keep this settings page open.');
@@ -106,7 +133,25 @@ export function App({ options = false }: { options?: boolean }) {
         <span className="pill">LOCAL</span>
       </header>
       <p className="tagline">Zap AI-style social noise.</p>
-      {!options && needsSetup && (
+      {!options && page?.supported && page.health?.code && (
+        <section
+          className="setup-reminder adapter-warning"
+          aria-label="Page compatibility"
+        >
+          <h2>SlopZap paused on this page</h2>
+          <p>
+            This page could not be read reliably. SlopZap has restored its
+            changes and stopped analysis.
+          </p>
+          <p>
+            Local diagnostic: <code>{page.health.code}</code>
+          </p>
+          <button disabled={retrying} onClick={() => void retryAdapter()}>
+            {retrying ? 'Retrying…' : 'Retry page check'}
+          </button>
+        </section>
+      )}
+      {!options && needsSetup && !page?.health?.code && (
         <section className="setup-reminder">
           <p>New to SlopZap? Choose your view and sites in quick setup.</p>
           <button
@@ -120,7 +165,7 @@ export function App({ options = false }: { options?: boolean }) {
           </button>
         </section>
       )}
-      {!options && (
+      {!options && !page?.health?.code && (
         <section className="meter" aria-label="Slopometer">
           <span className="eyebrow">
             {page?.supported ? `${page.platform} · Slopometer` : 'Slopometer'}

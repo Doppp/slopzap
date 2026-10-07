@@ -15,6 +15,7 @@ import { ChromePromptProvider } from '../providers/chrome-prompt';
 import { compose, PROVIDER_VERSION } from '../providers/compose';
 import { CLASSIFIER_VERSION } from '../shared/types';
 import { Renderer } from '../rendering/renderer';
+import { AdapterHealth, type AdapterFailure } from './adapter-health';
 import {
   aggregate,
   presentations,
@@ -34,6 +35,9 @@ export class Runtime {
   private settings: Settings = DEFAULT_SETTINGS;
   private adapter: Adapter | undefined;
   private route = '';
+  private pausedRoute: string | undefined;
+  private health = new AdapterHealth();
+  private sampled = new WeakSet<HTMLElement>();
   private generation = 0;
   private worker: LocalClassifier | undefined;
   private mutation: MutationObserver | undefined;
@@ -79,11 +83,20 @@ export class Runtime {
   }
   private onMessage = (
     message: { type?: string; settings?: unknown },
-    sender: { id?: string },
+    sender: { id?: string; url?: string },
     sendResponse: (response: unknown) => void,
   ): boolean => {
     if (sender.id !== browser.runtime.id) return false;
-    if (message.type === 'SETTINGS_CHANGED') {
+    if (message.type === 'RETRY_ADAPTER') {
+      // Only an extension page can explicitly resume a paused route.
+      if (!sender.url?.startsWith(browser.runtime.getURL('/'))) return false;
+      this.cleanupRoute();
+      this.pausedRoute = undefined;
+      this.health = new AdapterHealth();
+      this.sampled = new WeakSet();
+      this.checkRoute();
+      sendResponse({ ok: true });
+    } else if (message.type === 'SETTINGS_CHANGED') {
       const previous = this.settings;
       this.settings = parseSettings(message.settings);
       if (
@@ -93,7 +106,6 @@ export class Runtime {
       ) {
         this.cleanupRoute();
         this.adapter = undefined;
-        this.route = '';
         this.checkRoute();
       } else this.render();
       sendResponse({ ok: true });
@@ -103,6 +115,7 @@ export class Runtime {
         platform: this.adapter?.platform,
         settings: this.settings,
         aggregate: this.snapshot(),
+        health: this.health.snapshot(),
         stats: {
           bound: this.entries.size,
           candidates: this.candidates.size,
@@ -127,6 +140,9 @@ export class Runtime {
     if (route !== this.route) {
       this.cleanupRoute();
       this.route = route;
+      this.pausedRoute = undefined;
+      this.health = new AdapterHealth();
+      this.sampled = new WeakSet();
     }
     if (
       !this.settings.enabled ||
@@ -137,6 +153,8 @@ export class Runtime {
       this.adapter = undefined;
       return;
     }
+    this.adapter = adapter;
+    if (this.pausedRoute === route) return;
     const roots = Array.from(
       document.querySelectorAll<HTMLElement>(adapter.roots),
     ).filter(
@@ -334,8 +352,24 @@ export class Runtime {
         if (!node.isConnected || !this.eligible.has(node)) continue;
         const old = this.entries.get(node);
         old?.renderer.cleanup();
-        const binding = this.adapter.parse(node);
+        let binding: Binding | null;
+        try {
+          binding = this.adapter.parse(node);
+        } catch {
+          this.pauseAdapter('adapter_parse_exception');
+          return;
+        }
+        if (!this.sampled.has(node)) {
+          this.sampled.add(node);
+          const failure = this.health.record(!!binding);
+          if (failure) {
+            this.pauseAdapter(failure);
+            return;
+          }
+        }
         if (!binding) {
+          if (old) this.history.delete(old.fingerprint);
+          if (old) this.providerQueue.delete(old);
           this.entries.delete(node);
           continue;
         }
@@ -383,6 +417,7 @@ export class Runtime {
         } catch {
           /* cache failure does not stop local processing */
         }
+        if (generation !== this.generation) return;
         for (const entry of missing) {
           entry.result = cached.results.find(
             (result) => result.fingerprint === entry.fingerprint,
@@ -403,6 +438,7 @@ export class Runtime {
               fingerprint: entry.fingerprint,
             })),
           );
+          if (generation !== this.generation) return;
           this.classifiedCount += results.length;
           for (const entry of missing)
             entry.result =
@@ -588,8 +624,16 @@ export class Runtime {
     this.queue.delete(node);
     this.intersection?.unobserve(node);
     this.visibleObserver?.unobserve(node);
-    this.entries.get(node)?.renderer.cleanup();
+    const entry = this.entries.get(node);
+    entry?.renderer.cleanup();
+    if (entry) this.providerQueue.delete(entry);
     this.entries.delete(node);
+  }
+  private pauseAdapter(code: AdapterFailure): void {
+    this.health.pause(code);
+    this.pausedRoute = this.route;
+    // Invalidate all in-flight work before restoring the host page.
+    this.cleanupRoute();
   }
   private cleanupRoute(): void {
     this.generation++;
