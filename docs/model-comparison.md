@@ -14,7 +14,7 @@ Availability is not an instruction to force support. Chrome's [Prompt API docume
 
 ## Comparison controls
 
-Each example is submitted once per condition using an opaque target ID; intended labels and semantic example IDs do not enter the model prompt. Both conditions share the same classification/output policy. Only the reference lesson instructions and retrieved pairs differ. The ordinary browsing provider remains guided by default; no production setting exposes the experimental control.
+Each example is submitted once per condition using an opaque target ID; intended labels and semantic example IDs do not enter the model prompt. Both conditions share the same classification/output policy. Only the reference lesson instructions and retrieved pairs differ. Ordinary browsing and model preparation now omit the reference guide; guided prompts require explicit developer-experiment opt-in. No production setting exposes that control.
 
 Arm order alternates across examples. Each arm creates a fresh provider/base session, clones it, then destroys the clone and closes the base. An eight-second deadline includes availability, session creation, cloning and inference; failures are controlled codes, never retained exception messages. Single-example calls isolate this developer experiment, rather than changing the runtime's normal batching policy.
 
@@ -28,4 +28,22 @@ Unit tests cover balanced examples, label separation, alternating arm order, pai
 
 `pnpm model:probe` performs a read-only check in an empty, disposable windowed installed-Chrome profile and loopback web page; add `--headless` for a windowless check. It never calls model `create()`, opens live sites or touches the user's profile. It retains Chrome's sandbox and normal model services without forcing feature or eligibility flags. Chrome's normal background component/network activity is allowed; the probe does not request a model download. The temporary profile is removed afterward.
 
-On 8 October 2026, Chrome 155.0.8059.40 returned `downloadable` in both corrected probe modes. An earlier `unavailable` result was confounded by [Playwright's default launcher switches](https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromiumSwitches.ts), which suppress OptimizationHints, component updates and background networking. A separate isolated windowed diagnostic, using Chrome's [internal debugging page](https://developer.chrome.com/docs/ai/debug-built-in-model), reported device capability, sufficient VRAM/disk and no installed model. No creation/download was requested. Eligibility for downloading is not a completed model comparison or resource/quality acceptance; real on-device comparison remains pending.
+On 8 October 2026, Chrome 155.0.8059.40 returned `downloadable` in both corrected probe modes. An earlier `unavailable` result was confounded by [Playwright's default launcher switches](https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromiumSwitches.ts), which suppress OptimizationHints, component updates and background networking. A separate isolated windowed diagnostic, using Chrome's [internal debugging page](https://developer.chrome.com/docs/ai/debug-built-in-model), reported device capability, sufficient VRAM/disk and no installed model. The read-only probe itself requested no creation/download.
+
+## Real model findings
+
+Three real runs on 8 October 2026 used the packaged extension at commit `9af2c09`, Chrome 155.0.8059.40 and an isolated windowed profile. Developer installation used Chrome's [Extensions.loadUnpacked command](https://chromium.googlesource.com/chromium/src.git/+/225b2eaa7f23c33b7c4e30c1bfc58f1bd99cbe1c%5E%21/) over a private debugging pipe with `--enable-unsafe-extension-debugging`; no model eligibility flags were forced. The Settings preparation button downloaded and initialized the model. Browsing analysis was then disabled before running the comparison. Each run exported numeric results through the comparison page. The temporary profile and its model were removed afterward.
+
+The [numeric snapshot](../evaluation/reports/chrome-reference-2026-10-08.json) retains all outcomes, including missing outputs. At threshold 0.70, false positives below are counts among the intended useful examples with valid outputs in both arms:
+
+| Run | Valid pairs | Baseline false positives | Guided false positives | Missing guided outputs |
+| --- | ----------- | ------------------------ | ---------------------- | ---------------------- |
+| 1   | 11/12       | 1/5                      | 2/5                    | 1                      |
+| 2   | 9/12        | 2/4                      | 1/4                    | 3                      |
+| 3   | 11/12       | 1/6                      | 4/6                    | 1                      |
+
+All 36 baseline calls returned valid matched outputs; 31 of 36 guided calls did. No call reached the eight-second deadline. A `missing` outcome means no validated target result was returned, not a diagnosed model failure cause. All three reports remain `incomplete`. These are repetitions of the same 12 invented examples, not 36 independent examples; intended labels still come from the implementation agent.
+
+The application composition abstained on every paired useful example in both conditions, producing no positive useful-example classifications at 0.70 in these runs. That is incomplete, conservative coverage—not proof of accuracy. Raw sarcasm scores were high in both conditions, and the guided arm also flagged useful quoted criticism, a question and a caveat in some runs. Reference benefit was not established, so guidance is now developer-only; ordinary prompts use the existing baseline policy and provider/cache suffix `chrome-prompt-v4`.
+
+Valid calls took a median 1.889 seconds without references and 2.214 seconds with references; nearest-rank p95 was 2.564 and 4.776 seconds respectively. These timings include session/browser overhead and omit missing outputs; they are not CPU, RAM, battery or reference-hardware acceptance. The snapshot records the earlier `chrome-prompt-v3` comparison build. No prompt was tuned to these case labels, thresholds were not lowered, and automatic hiding remains disabled. Independent accuracy, minimum-device/resource profiling and live-platform acceptance remain open.

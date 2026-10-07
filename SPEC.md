@@ -6,7 +6,7 @@ Implementation note (2026-10-07): the repository now contains a development alph
 
 Target: Chrome Manifest V3, desktop
 
-Last verified: 2026-10-07
+Last verified: 2026-10-08
 
 License: MIT (already present in this repository)
 
@@ -1121,7 +1121,7 @@ Discovery traverses at most 200 nodes or five milliseconds per slice; two Inters
 
 ### 42.5 Optional model behavior
 
-Chrome model analysis runs in a document context, separately from the local queue, with at most 12 inputs per prompt, one prompt per tab and an eight-second abort deadline. Clone an unprompted base session per batch, validate the exact schema and destroy the clone. Destroy the base after 60 seconds idle. Model downloads require an explicit options-page action. User-facing local results render before model work. The actual hardware/model path remains capability-dependent and is tested with mocks until real-device verification.
+Chrome model analysis runs in a document context, separately from the local queue, with at most 12 inputs per prompt, one prompt per tab and an eight-second abort deadline. Clone an unprompted base session per batch, validate the exact schema and destroy the clone. Destroy the base after 60 seconds idle. Model downloads require an explicit options-page action. User-facing local results render before model work. Automated regressions use mocks; §42.11 records a small real packaged-extension diagnostic, not independent accuracy or resource acceptance.
 
 ### 42.6 Developer testing and public-release readiness
 
@@ -1147,6 +1147,14 @@ The optional Chrome model receives at most two paired references per batch, sele
 
 ### 42.10 Paired model comparison tooling
 
-The packaged `comparison.html` page, opened from Settings, compares guided and baseline Chrome prompts on 12 new invented examples. The experimental provider constructor can omit reference guidance while ordinary browsing retains the same guided default and prompt version. Both conditions share the base policy and output schema; labels stay outside prompts, target IDs are opaque, arm order alternates and every arm uses a fresh provider/session with an eight-second deadline. Single-example calls belong only to this isolated developer experiment, not normal runtime scheduling.
+The packaged `comparison.html` page, opened from Settings, compares guided and baseline Chrome prompts on 12 new invented examples. The provider constructor explicitly selects the developer arm; ordinary browsing now omits reference guidance following §42.11. Both conditions share the base policy and output schema; labels stay outside prompts, target IDs are opaque, arm order alternates and every arm uses a fresh provider/session with an eight-second deadline. Single-example calls belong only to this isolated developer experiment, not normal runtime scheduling.
 
-Reports distinguish raw model scores from conservative application composition, use only valid paired outputs for metrics at 0.70/0.85, and expose missing/cancelled arms. Numeric user-triggered exports contain no text, raw responses, identities, URLs, fingerprints or settings. The page never starts a download, changes preferences, writes the cache or authorizes automatic hiding. API availability checks do not infer. UI/harness tests use mocks, not real-model quality evidence; the read-only isolated Chrome web probe returned unavailable. See `docs/model-comparison.md`. Reference benefit, eligible-device verification and independent accuracy gates remain unmet.
+Reports distinguish raw model scores from conservative application composition, use only valid paired outputs for metrics at 0.70/0.85, and expose missing/cancelled arms. Numeric user-triggered exports contain no text, raw responses, identities, URLs, fingerprints or settings. The page never starts a download, changes preferences, writes the cache or authorizes automatic hiding. API availability checks do not infer. UI/harness tests use mocks, not real-model quality evidence; corrected isolated Chrome web probes returned downloadable when normal model services were retained. See `docs/model-comparison.md` and §42.11. Reference benefit and independent accuracy gates remain unmet.
+
+### 42.11 Real on-device development comparison
+
+On 8 October 2026, Chrome 155.0.8059.40 loaded the packaged extension in an isolated windowed developer profile, prepared the model through the Settings action, and ran three comparisons after browsing analysis was disabled. The earlier probe failure was confounded by Playwright's model-service suppressions. Chrome's eligibility checks were retained. No live content was accessed, and the normal user profile remained untouched. The temporary test profile/model were removed afterward.
+
+The three runs yielded 11, 9 and 11 valid pairs out of 12 invented examples, with missing guided outputs in every run. At 0.70, raw false-positive counts among paired intended useful examples were 1/5 versus 2/5, 2/4 versus 1/4, and 1/6 versus 4/6 for baseline versus guided. Composition abstained on all paired useful examples in both arms; that is limited coverage, not validated precision. These are repeated observations of one tiny author-labelled casebook, not independent release evidence. Record the unmodified numeric exports in `evaluation/reports/chrome-reference-2026-10-08.json`; do not relabel cases or tune prompts to claim benefit.
+
+Reference guidance is therefore developer-only. Ordinary model preparation and browsing use the existing baseline policy without retrieved pairs; provider/cache suffix becomes `chrome-prompt-v4` to invalidate old guided scores. Local dictionary features remain provisional and unchanged. Both experimental arms remain available. No threshold, schema acceptance, abstention or automatic-hiding gate is weakened. Independent paired quality, minimum-device/resource profiles, live-platform checks and manual audits remain required.
