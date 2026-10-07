@@ -36,6 +36,8 @@ export class Runtime {
   private mutation: MutationObserver | undefined;
   private roots: HTMLElement[] = [];
   private intersection: IntersectionObserver | undefined;
+  private visibleObserver: IntersectionObserver | undefined;
+  private visible = new Set<HTMLElement>();
   private entries = new Map<HTMLElement, Entry>();
   private candidates = new Set<HTMLElement>();
   private eligible = new Set<HTMLElement>();
@@ -43,6 +45,9 @@ export class Runtime {
   private history = new Map<string, ScoredItem>();
   private dirty: Node[] = [];
   private discoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  private scan: TreeWalker | undefined;
+  private sweepTimer: ReturnType<typeof setTimeout> | undefined;
+  private scrollTimer: ReturnType<typeof setTimeout> | undefined;
   private batchTimer: ReturnType<typeof setTimeout> | undefined;
   private routeTimer: ReturnType<typeof setInterval> | undefined;
   private busy = false;
@@ -61,6 +66,7 @@ export class Runtime {
     window.addEventListener('popstate', this.checkRoute);
     window.addEventListener('hashchange', this.checkRoute);
     window.addEventListener('pagehide', this.stop);
+    window.addEventListener('scroll', this.onScroll, { passive: true });
     this.routeTimer = setInterval(this.checkRoute, 1000);
     this.checkRoute();
   }
@@ -131,6 +137,13 @@ export class Runtime {
     this.roots = roots;
     this.adapter = adapter;
     this.worker = new LocalClassifier();
+    this.visibleObserver = new IntersectionObserver((changes) => {
+      for (const change of changes) {
+        const node = change.target as HTMLElement;
+        if (change.isIntersecting) this.visible.add(node);
+        else this.visible.delete(node);
+      }
+    });
     this.intersection = new IntersectionObserver(
       (changes) => {
         for (const change of changes) {
@@ -154,6 +167,17 @@ export class Runtime {
             ? (record.target as Element)
             : record.target.parentElement;
         if (target?.closest('[data-slopzap-ui]')) continue;
+        if (
+          [...record.removedNodes].some(
+            (node) =>
+              !(node instanceof Element && node.matches('[data-slopzap-ui]')),
+          ) &&
+          this.sweepTimer === undefined
+        )
+          this.sweepTimer = setTimeout(() => {
+            this.sweepTimer = undefined;
+            this.sweep();
+          }, 0);
         for (const added of record.addedNodes)
           if (!(added instanceof Element && added.matches('[data-slopzap-ui]')))
             this.dirty.push(added);
@@ -177,7 +201,6 @@ export class Runtime {
         }
       }
       if (this.dirty.length) this.scheduleDiscovery();
-      this.sweep();
       this.scheduleBatch();
     });
     for (const root of roots) {
@@ -197,32 +220,76 @@ export class Runtime {
     this.discoveryTimer = setTimeout(() => {
       this.discoveryTimer = undefined;
       const start = performance.now();
-      while (this.dirty.length && performance.now() - start < 5) {
-        const node = this.dirty.shift();
-        if (
-          !(node instanceof HTMLElement) ||
-          !node.isConnected ||
-          !this.adapter
-        )
-          continue;
-        const nodes = [
-          ...(node.matches(this.adapter.candidates) ? [node] : []),
-          ...node.querySelectorAll<HTMLElement>(this.adapter.candidates),
-        ];
-        for (const candidate of nodes)
-          if (
-            !this.candidates.has(candidate) &&
-            !candidate.closest(
-              'form,[contenteditable="true"],[data-slopzap-ui]',
-            )
-          ) {
-            this.candidates.add(candidate);
-            this.intersection?.observe(candidate);
-          }
+      let traversed = 0;
+      while (
+        (this.dirty.length || this.scan) &&
+        performance.now() - start < 5 &&
+        traversed++ < 200
+      ) {
+        if (!this.scan) {
+          const root = this.dirty.shift();
+          if (!(root instanceof HTMLElement) || !root.isConnected) continue;
+          this.registerCandidate(root);
+          this.scan = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+            acceptNode: (node) =>
+              node instanceof Element &&
+              node.matches(
+                'form,[contenteditable]:not([contenteditable="false"]),[data-slopzap-ui],script,style',
+              )
+                ? NodeFilter.FILTER_REJECT
+                : NodeFilter.FILTER_ACCEPT,
+          });
+        }
+        const node = this.scan.nextNode();
+        if (node instanceof HTMLElement) this.registerCandidate(node);
+        else this.scan = undefined;
       }
-      if (this.dirty.length) this.scheduleDiscovery();
+      if (this.dirty.length || this.scan) this.scheduleDiscovery();
     }, 0);
   }
+  private registerCandidate(node: HTMLElement): void {
+    if (
+      !this.adapter ||
+      !node.matches(this.adapter.candidates) ||
+      this.candidates.has(node) ||
+      node.closest(
+        'form,[contenteditable]:not([contenteditable="false"]),[data-slopzap-ui]',
+      )
+    )
+      return;
+    if (this.candidates.size >= 1000) {
+      const stale = [...this.candidates].find(
+        (candidate) => !this.eligible.has(candidate),
+      );
+      if (!stale) return;
+      this.release(stale);
+    }
+    this.candidates.add(node);
+    this.intersection?.observe(node);
+    this.visibleObserver?.observe(node);
+  }
+  private onScroll = (): void => {
+    if (this.scrollTimer !== undefined) return;
+    this.scrollTimer = setTimeout(() => {
+      this.scrollTimer = undefined;
+      if (!this.adapter) return;
+      // Rediscover visible nodes dropped from the bounded observation window.
+      for (const x of [innerWidth * 0.25, innerWidth * 0.75])
+        for (const y of [1, innerHeight * 0.5, innerHeight - 1]) {
+          for (const element of document.elementsFromPoint(x, y)) {
+            const candidate = element.closest<HTMLElement>(
+              this.adapter.candidates,
+            );
+            if (
+              candidate &&
+              this.roots.some((root) => root.contains(candidate))
+            )
+              this.registerCandidate(candidate);
+          }
+        }
+      this.sweep();
+    }, 100);
+  };
   private scheduleBatch(): void {
     if (
       !this.queue.size ||
@@ -240,7 +307,9 @@ export class Runtime {
     if (!this.adapter || !this.worker) return;
     this.busy = true;
     const generation = this.generation;
-    const batch = Array.from(this.queue).slice(0, 16);
+    const batch = Array.from(this.queue)
+      .sort((a, b) => Number(this.visible.has(b)) - Number(this.visible.has(a)))
+      .slice(0, 16);
     batch.forEach((node) => this.queue.delete(node));
     try {
       const work: Entry[] = [];
@@ -326,6 +395,11 @@ export class Runtime {
       if (this.history.size > 10_000)
         this.history.delete(this.history.keys().next().value!);
       this.render();
+      if (this.entries.size > 300)
+        for (const node of this.entries.keys()) {
+          if (this.entries.size <= 250) break;
+          if (!this.eligible.has(node)) this.release(node);
+        }
     } catch {
       /* fail open; restore all presentation for this failed batch */
       for (const node of batch) {
@@ -401,34 +475,45 @@ export class Runtime {
   }
   private sweep(): void {
     for (const node of this.candidates)
-      if (!node.isConnected) {
-        this.candidates.delete(node);
-        this.eligible.delete(node);
-        this.queue.delete(node);
-        this.intersection?.unobserve(node);
-        this.entries.get(node)?.renderer.cleanup();
-        this.entries.delete(node);
-      }
+      if (!node.isConnected) this.release(node);
+  }
+  private release(node: HTMLElement): void {
+    this.candidates.delete(node);
+    this.eligible.delete(node);
+    this.visible.delete(node);
+    this.queue.delete(node);
+    this.intersection?.unobserve(node);
+    this.visibleObserver?.unobserve(node);
+    this.entries.get(node)?.renderer.cleanup();
+    this.entries.delete(node);
   }
   private cleanupRoute(): void {
     this.generation++;
     this.mutation?.disconnect();
     this.intersection?.disconnect();
+    this.visibleObserver?.disconnect();
     this.worker?.close();
     this.mutation = undefined;
     this.roots = [];
     this.intersection = undefined;
+    this.visibleObserver = undefined;
     this.worker = undefined;
     if (this.discoveryTimer !== undefined) clearTimeout(this.discoveryTimer);
     if (this.batchTimer !== undefined) clearTimeout(this.batchTimer);
+    if (this.sweepTimer !== undefined) clearTimeout(this.sweepTimer);
+    if (this.scrollTimer !== undefined) clearTimeout(this.scrollTimer);
     if (this.renderFrame) cancelAnimationFrame(this.renderFrame);
     this.discoveryTimer = undefined;
     this.batchTimer = undefined;
+    this.sweepTimer = undefined;
+    this.scrollTimer = undefined;
+    this.scan = undefined;
     this.renderFrame = 0;
     for (const entry of this.entries.values()) entry.renderer.cleanup();
     this.entries.clear();
     this.candidates.clear();
     this.eligible.clear();
+    this.visible.clear();
     this.queue.clear();
     this.history.clear();
     this.dirty = [];
@@ -441,5 +526,6 @@ export class Runtime {
     window.removeEventListener('popstate', this.checkRoute);
     window.removeEventListener('hashchange', this.checkRoute);
     window.removeEventListener('pagehide', this.stop);
+    window.removeEventListener('scroll', this.onScroll);
   };
 }
