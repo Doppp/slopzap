@@ -12,9 +12,12 @@ export function authoredText(node: HTMLElement | null): string {
   if (!node) return '';
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
   const chunks: string[] = [];
+  let characters = 0;
+  let visited = 0;
   let current: Node | null,
     block: Element | null = null;
   while ((current = walker.nextNode())) {
+    if (++visited > 2000 || characters >= 12_000) break;
     const parent = current.parentElement;
     if (
       !parent ||
@@ -25,8 +28,14 @@ export function authoredText(node: HTMLElement | null): string {
       continue;
     const nextBlock = parent.closest('p,div,li,pre,blockquote,h1,h2,h3');
     if (block && block !== nextBlock) chunks.push('\n');
-    const value = current.textContent?.replace(/[\t\r\n ]+/g, ' ').trim();
-    if (value) chunks.push(value);
+    const value = current.textContent
+      ?.slice(0, 12_000 - characters)
+      .replace(/[\t\r\n ]+/g, ' ')
+      .trim();
+    if (value) {
+      chunks.push(value);
+      characters += value.length;
+    }
     block = nextBlock;
   }
   return chunks

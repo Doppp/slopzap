@@ -57,13 +57,14 @@ export class Renderer {
         : '⚡ Not enough evidence';
     label.title = `${result.reasons.join(' · ')}. Slop Score estimates low-information synthetic signals; it does not prove AI authorship.`;
     shadow.append(label);
-    if (presentation !== 'visible' || this.reveal)
-      shadow.append(
-        this.button(this.reveal ? 'Hide' : 'Show', () => {
-          this.reveal = !this.reveal;
-          this.render(presentation, mode, result, verdict);
-        }),
-      );
+    if (presentation !== 'visible' || this.reveal) {
+      const toggle = this.button(this.reveal ? 'Hide' : 'Show', () => {
+        this.reveal = !this.reveal;
+        this.render(presentation, mode, result, verdict);
+      });
+      toggle.setAttribute('aria-expanded', String(this.reveal));
+      shadow.append(toggle);
+    }
     shadow.append(
       this.button('Not slop', () => this.feedback('not_slop')),
       this.button('Slop', () => this.feedback('slop')),

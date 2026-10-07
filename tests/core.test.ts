@@ -36,6 +36,27 @@ test('specific contributions score below interchangeable paraphrasing', () => {
   expect(generic.automaticHide).toBe(false);
 });
 describe('classification safety', () => {
+  test('unsupported language and oversized article inputs abstain', () => {
+    expect(
+      classify(
+        {
+          ...unit,
+          text: "J'ai testé cette configuration hier et les résultats étaient différents sur mon ordinateur. Le cache semblait manquer de mémoire.",
+        },
+        'c',
+      ).status,
+    ).toBe('insufficient_evidence');
+    expect(
+      classify(
+        {
+          ...unit,
+          kind: 'article',
+          text: 'The system works because the cache is warm. '.repeat(300),
+        },
+        'd',
+      ).status,
+    ).toBe('insufficient_evidence');
+  });
   test('short comments abstain and heuristic results never auto-hide', () => {
     expect(classify({ ...unit, text: 'Great insight!' }, 'a').status).toBe(
       'insufficient_evidence',

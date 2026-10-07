@@ -43,6 +43,7 @@ export class ChromePromptProvider implements Provider {
   readonly id = 'chrome_prompt';
   private session: Promise<ModelSession> | undefined;
   private disposed = false;
+  private idleTimer: ReturnType<typeof setTimeout> | undefined;
   constructor(private api: ModelFactory | undefined = factory()) {}
   async ready(): Promise<boolean> {
     return (
@@ -55,6 +56,7 @@ export class ChromePromptProvider implements Provider {
     inputs: ProviderInput[],
     signal: AbortSignal,
   ): Promise<ProviderResult[]> {
+    if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
     if (!(await this.ready()) || inputs.length > 12) return [];
     this.session ??= this.api!.create({
       ...OPTIONS,
@@ -72,9 +74,17 @@ export class ChromePromptProvider implements Provider {
       return validateOutput(JSON.parse(raw), inputs);
     } finally {
       clone.destroy();
+      this.idleTimer = setTimeout(() => {
+        if (this.session)
+          void this.session
+            .then((session) => session.destroy())
+            .catch(() => {});
+        this.session = undefined;
+      }, 60_000);
     }
   }
   close(): void {
+    if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
     this.disposed = true;
     if (this.session)
       void this.session.then((session) => session.destroy()).catch(() => {});

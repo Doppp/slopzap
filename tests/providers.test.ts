@@ -46,13 +46,11 @@ test('each batch uses a fresh cloned session and destroys it', async () => {
   const destroy = vi.fn();
   const clone: ModelSession = {
     clone: vi.fn(),
-    prompt: vi
-      .fn()
-      .mockResolvedValue(
-        JSON.stringify({
-          results: [{ id: 'one', score: 0.7, evidence: 0.8, reasons: [] }],
-        }),
-      ),
+    prompt: vi.fn().mockResolvedValue(
+      JSON.stringify({
+        results: [{ id: 'one', score: 0.7, evidence: 0.8, reasons: [] }],
+      }),
+    ),
     destroy,
   };
   const base: ModelSession = {

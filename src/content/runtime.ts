@@ -91,6 +91,8 @@ export class Runtime {
         previous.onDevice !== this.settings.onDevice ||
         JSON.stringify(previous.sites) !== JSON.stringify(this.settings.sites)
       ) {
+        this.cleanupRoute();
+        this.adapter = undefined;
         this.route = '';
         this.checkRoute();
       } else this.render();
@@ -372,7 +374,7 @@ export class Runtime {
             version: this.settings.onDevice
               ? PROVIDER_VERSION
               : CLASSIFIER_VERSION,
-            keys: missing.map((entry) => entry.fingerprint),
+            keys: [...new Set(missing.map((entry) => entry.fingerprint))],
           });
           if (value?.results) cached = value;
         } catch {
@@ -384,7 +386,13 @@ export class Runtime {
           );
           entry.verdict = cached.overrides[entry.fingerprint];
         }
-        const inputs = missing.filter((entry) => !entry.result);
+        const inputs = [
+          ...new Map(
+            missing
+              .filter((entry) => !entry.result)
+              .map((entry) => [entry.fingerprint, entry]),
+          ).values(),
+        ];
         if (inputs.length) {
           const results = await this.worker.classify(
             inputs.map((entry) => ({
@@ -393,10 +401,11 @@ export class Runtime {
             })),
           );
           this.classifiedCount += results.length;
-          for (const entry of inputs)
-            entry.result = results.find(
-              (result) => result.fingerprint === entry.fingerprint,
-            );
+          for (const entry of missing)
+            entry.result =
+              results.find(
+                (result) => result.fingerprint === entry.fingerprint,
+              ) ?? entry.result;
           void browser.runtime
             .sendMessage({ type: 'CACHE_SAVE', results })
             .catch(() => {});
@@ -404,7 +413,11 @@ export class Runtime {
       }
       if (generation !== this.generation) return;
       for (const entry of work)
-        if (entry.binding.container.isConnected)
+        if (this.queue.has(entry.binding.container)) entry.renderer.cleanup();
+        else if (
+          entry.binding.container.isConnected &&
+          this.entries.get(entry.binding.container) === entry
+        )
           this.history.set(entry.fingerprint, this.scored(entry));
       // History holds numeric results, never DOM nodes or raw text.
       if (this.history.size > 10_000)
@@ -538,7 +551,11 @@ export class Runtime {
       const start = performance.now();
       while (index < entries.length && performance.now() - start < 5) {
         const entry = entries[index++]!;
-        if (entry.binding.container.isConnected)
+        if (this.queue.has(entry.binding.container)) entry.renderer.cleanup();
+        else if (
+          entry.binding.container.isConnected &&
+          this.entries.get(entry.binding.container) === entry
+        )
           entry.renderer.render(
             map.get(entry.key) ?? 'visible',
             mode,

@@ -35,6 +35,26 @@ export function features(unit: Unit) {
   const latin =
     tokens.filter((token) => /^[a-z]+$/.test(token)).length /
     Math.max(1, tokens.length);
+  const englishAnchors = new Set(
+    tokens.filter((token) =>
+      [
+        'the',
+        'and',
+        'this',
+        'that',
+        'with',
+        'because',
+        'was',
+        'were',
+        'for',
+        'have',
+        'your',
+        'my',
+        'it',
+        'to',
+      ].includes(token),
+    ),
+  ).size;
   return {
     tokens: tokens.length,
     generic: Math.min(1, genericCount / 3),
@@ -42,6 +62,8 @@ export function features(unit: Unit) {
     redundancy: overlap > 0.6 ? overlap : 0,
     lowDiversity: tokens.length >= 20 && diversity < 0.5 ? 1 - diversity : 0,
     specific,
-    supported: latin >= 0.8,
+    supported:
+      latin >= 0.8 &&
+      (englishAnchors >= 2 || genericCount >= 2 || formulaicCount >= 2),
   };
 }
