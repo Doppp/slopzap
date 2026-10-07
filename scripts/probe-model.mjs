@@ -6,6 +6,11 @@ import { createServer } from 'node:http';
 
 // Disposable empty web context only. Never read the user's browser profile,
 // call create(), load live pages, or override Chrome's eligibility checks.
+if (process.argv.slice(2).some((argument) => argument !== '--headless')) {
+  console.error('Usage: pnpm model:probe [--headless]');
+  process.exit(1);
+}
+const headless = process.argv.includes('--headless');
 const profile = await mkdtemp(join(tmpdir(), 'slopzap-model-probe-'));
 const server = createServer((_request, response) => {
   response.setHeader('Content-Type', 'text/html');
@@ -16,7 +21,20 @@ try {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   context = await chromium.launchPersistentContext(profile, {
     channel: 'chrome',
-    headless: true,
+    headless,
+    // Playwright normally suppresses OptimizationHints, component updates and
+    // background networking. Those switches confound AI availability. Keep
+    // Chrome's normal model services and sandbox, with only isolated-profile
+    // and automation transport arguments; never force an eligibility feature.
+    ignoreDefaultArgs: true,
+    args: [
+      `--user-data-dir=${profile}`,
+      '--remote-debugging-pipe',
+      '--no-first-run',
+      '--no-default-browser-check',
+      ...(headless ? ['--headless=new'] : []),
+      'about:blank',
+    ],
     timeout: 15000,
   });
   const page = await context.newPage();
@@ -52,8 +70,8 @@ try {
   });
   console.log(
     JSON.stringify({
-      scope:
-        'isolated headless empty loopback web page; not extension or hardware acceptance',
+      scope: `isolated ${headless ? 'headless' : 'headed'} empty loopback web page; not extension or hardware acceptance`,
+      launchPolicy: 'normal Chrome model services; no eligibility overrides',
       chromeVersion: context.browser().version(),
       ...result,
       modelCreationRequested: false,
