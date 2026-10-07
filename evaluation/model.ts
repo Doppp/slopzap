@@ -1,4 +1,5 @@
 import { features } from '../src/classifier/features';
+import { CLASSIFIER_VERSION } from '../src/shared/types';
 import { agreed, unit, type Example } from './schema';
 export const FEATURE_NAMES = [
   'bias',
@@ -10,7 +11,8 @@ export const FEATURE_NAMES = [
   'length',
 ] as const;
 export interface Model {
-  version: 'experimental-logistic-v1';
+  version: 'experimental-logistic-v2';
+  featureVersion: string;
   features: string[];
   weights: number[];
   calibration: number[];
@@ -85,7 +87,8 @@ export function train(rows: Example[]): Model {
     false,
   );
   return {
-    version: 'experimental-logistic-v1',
+    version: 'experimental-logistic-v2',
+    featureVersion: CLASSIFIER_VERSION,
     features: [...FEATURE_NAMES],
     weights,
     calibration,
@@ -99,6 +102,7 @@ export function score(model: Model, row: Example): number | null {
   if (
     f.tokens < 8 ||
     !f.supported ||
+    f.quotedRatio > 0.5 ||
     (row.kind === 'article' && row.text.length > 8000)
   )
     return null;
@@ -112,6 +116,7 @@ export function parseModel(value: unknown): Model {
       (key) =>
         ![
           'version',
+          'featureVersion',
           'features',
           'weights',
           'calibration',
@@ -120,7 +125,8 @@ export function parseModel(value: unknown): Model {
           'automaticHide',
         ].includes(key),
     ) ||
-    model.version !== 'experimental-logistic-v1' ||
+    model.version !== 'experimental-logistic-v2' ||
+    model.featureVersion !== CLASSIFIER_VERSION ||
     JSON.stringify(model.features) !== JSON.stringify(FEATURE_NAMES) ||
     !Array.isArray(model.weights) ||
     model.weights.length !== FEATURE_NAMES.length ||

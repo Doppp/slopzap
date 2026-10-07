@@ -3,6 +3,7 @@ import { corpus, type Example } from '../evaluation/schema';
 import { metrics, ranking, confidence } from '../evaluation/metrics';
 import { report } from '../evaluation/report';
 import { train, score, parseModel, FEATURE_NAMES } from '../evaluation/model';
+import { CLASSIFIER_VERSION } from '../src/shared/types';
 const example = (id = 'one'): Example => ({
   id,
   splitGroup: id,
@@ -88,7 +89,8 @@ test('ranking handles tied scores and exposes empty calibration', () => {
 });
 test('experimental model parsing rejects overflow-prone weights and undeclared fields', () => {
   const model = {
-    version: 'experimental-logistic-v1',
+    version: 'experimental-logistic-v2',
+    featureVersion: CLASSIFIER_VERSION,
     features: [...FEATURE_NAMES],
     weights: FEATURE_NAMES.map(() => 0),
     calibration: [0, 1],
@@ -97,6 +99,12 @@ test('experimental model parsing rejects overflow-prone weights and undeclared f
     automaticHide: false,
   };
   expect(parseModel(model)).toEqual(model);
+  expect(() =>
+    parseModel({ ...model, featureVersion: 'provisional-features-v3' }),
+  ).toThrow();
+  expect(() =>
+    parseModel({ ...model, version: 'experimental-logistic-v1' }),
+  ).toThrow();
   expect(() =>
     parseModel({ ...model, weights: FEATURE_NAMES.map(() => 1e308) }),
   ).toThrow();
