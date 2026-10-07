@@ -4,11 +4,45 @@ import { parseRequest } from '../src/messaging/protocol';
 import { parseSettings } from '../src/shared/types';
 import * as cache from '../src/cache/db';
 import { classify } from '../src/classifier/local';
+import {
+  applyChoices,
+  parseOnboarding,
+  shouldOpenOnboarding,
+} from '../src/state/onboarding';
 
 export default defineBackground(() => {
   void browser.storage.local.setAccessLevel({
     accessLevel: 'TRUSTED_CONTEXTS',
   });
+  browser.runtime.onInstalled.addListener((details) => {
+    if (details.reason !== 'install') return;
+    void (async () => {
+      const state = parseOnboarding(
+        (await browser.storage.local.get('onboarding')).onboarding,
+      );
+      if (!shouldOpenOnboarding(details.reason, state)) return;
+      // Persist presentation before opening a tab; worker restart must not duplicate it.
+      await browser.storage.local.set({
+        onboarding: { ...state, presented: true },
+      });
+      await browser.tabs.create({
+        url: browser.runtime.getURL('/onboarding.html'),
+      });
+    })().catch(() => {
+      /* the popup still offers quick setup if a tab cannot open */
+    });
+  });
+  const broadcast = async (settings: ReturnType<typeof parseSettings>) => {
+    try {
+      for (const tab of await browser.tabs.query({}))
+        if (tab.id)
+          void browser.tabs
+            .sendMessage(tab.id, { type: 'SETTINGS_CHANGED', settings })
+            .catch(() => {});
+    } catch {
+      /* persisted settings remain authoritative even if a tab disappears */
+    }
+  };
   browser.runtime.onMessage.addListener((value, sender, sendResponse) => {
     if (sender.id !== browser.runtime.id) return false;
     const request = parseRequest(value);
@@ -16,7 +50,12 @@ export default defineBackground(() => {
     // Settings mutations and destructive cache controls are trusted-page only.
     if (
       !sender.url?.startsWith(browser.runtime.getURL('/')) &&
-      ['SETTINGS_SET', 'CACHE_CLEAR'].includes(request.type)
+      [
+        'SETTINGS_SET',
+        'CACHE_CLEAR',
+        'ONBOARDING_GET',
+        'ONBOARDING_COMPLETE',
+      ].includes(request.type)
     )
       return false;
     const handle = async () => {
@@ -32,12 +71,26 @@ export default defineBackground(() => {
         case 'SETTINGS_SET': {
           const settings = parseSettings(request.settings);
           await browser.storage.local.set({ settings });
-          for (const tab of await browser.tabs.query({}))
-            if (tab.id)
-              void browser.tabs
-                .sendMessage(tab.id, { type: 'SETTINGS_CHANGED', settings })
-                .catch(() => {});
+          await broadcast(settings);
           return settings;
+        }
+        case 'ONBOARDING_GET':
+          return parseOnboarding(
+            (await browser.storage.local.get('onboarding')).onboarding,
+          );
+        case 'ONBOARDING_COMPLETE': {
+          const settings = parseSettings(
+            (await browser.storage.local.get('settings')).settings,
+          );
+          const next = request.choices
+            ? applyChoices(settings, request.choices)
+            : settings;
+          await browser.storage.local.set({
+            settings: next,
+            onboarding: { version: 1, presented: true, completed: true },
+          });
+          await broadcast(next);
+          return { ok: true, settings: next };
         }
         case 'CACHE_GET':
           return cache.lookup(
