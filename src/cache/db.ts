@@ -10,6 +10,31 @@ interface RecordValue {
   accessed: number;
   expires: number;
 }
+function validRecord(
+  value: unknown,
+  key: string,
+  store: 'results' | 'overrides',
+): value is RecordValue {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as RecordValue;
+  const allowed = [
+    'key',
+    'accessed',
+    'expires',
+    store === 'results' ? 'result' : 'verdict',
+  ];
+  return (
+    Object.keys(record).every((field) => allowed.includes(field)) &&
+    record.key === key &&
+    Number.isFinite(record.accessed) &&
+    record.accessed >= 0 &&
+    Number.isFinite(record.expires) &&
+    record.expires >= record.accessed &&
+    (store === 'results'
+      ? validResult(record.result) && record.result.fingerprint === key
+      : record.verdict === 'slop' || record.verdict === 'not_slop')
+  );
+}
 let opened: Promise<IDBDatabase> | undefined;
 function db(): Promise<IDBDatabase> {
   opened ??= new Promise((resolve, reject) => {
@@ -71,34 +96,32 @@ export async function lookup(
   const values = await Promise.all(
     keys.map(async (key) => {
       const [result, override] = await Promise.all([
-        requestValue(transaction.objectStore('results').get(key)) as Promise<
-          RecordValue | undefined
-        >,
-        requestValue(transaction.objectStore('overrides').get(key)) as Promise<
-          RecordValue | undefined
-        >,
+        requestValue<unknown>(transaction.objectStore('results').get(key)),
+        requestValue<unknown>(transaction.objectStore('overrides').get(key)),
       ]);
       for (const [name, record] of [
         ['results', result],
         ['overrides', override],
       ] as const)
         if (record) {
-          if (record.expires <= now) transaction.objectStore(name).delete(key);
+          if (!validRecord(record, key, name) || record.expires <= now)
+            transaction.objectStore(name).delete(key);
           else if (now - record.accessed > 3600000)
             transaction.objectStore(name).put({ ...record, accessed: now });
         }
       return {
         key,
         result:
-          result &&
-          validResult(result.result) &&
+          validRecord(result, key, 'results') &&
           result.expires > now &&
           (result.result?.version === version ||
             result.result?.version === CLASSIFIER_VERSION)
             ? result.result
             : undefined,
         override:
-          override && override.expires > now ? override.verdict : undefined,
+          validRecord(override, key, 'overrides') && override.expires > now
+            ? override.verdict
+            : undefined,
       };
     }),
   );

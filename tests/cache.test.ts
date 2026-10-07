@@ -67,3 +67,83 @@ test('expired scores are unavailable and raw text cannot enter cache messages', 
     clock.mockRestore();
   }
 });
+
+test('corrupt stored records fail open and are removed without refreshing unknown fields', async () => {
+  const opened = indexedDB.open('slopzap', 2);
+  const connection = await new Promise<IDBDatabase>((resolve, reject) => {
+    opened.onsuccess = () => resolve(opened.result);
+    opened.onerror = () => reject(opened.error);
+  });
+  const result = classify(
+    {
+      platform: 'reddit',
+      kind: 'reply',
+      id: 'invented-corruption',
+      parentId: null,
+      text: 'The invented cache example contains measurements rather than private content.',
+      parentText: '',
+      rootText: '',
+      quotedText: '',
+    },
+    'c'.repeat(64),
+  );
+  const now = Date.now();
+  const records = [
+    {
+      key: 'c'.repeat(64),
+      result: { ...result, fingerprint: 'd'.repeat(64) },
+      accessed: now,
+      expires: now + 86400000,
+    },
+    {
+      key: 'd'.repeat(64),
+      result: { ...result, fingerprint: 'd'.repeat(64) },
+      accessed: now,
+      expires: now + 86400000,
+      rawText: 'invented extra field',
+    },
+    {
+      key: 'e'.repeat(64),
+      result: { ...result, fingerprint: 'e'.repeat(64) },
+      accessed: now,
+      expires: NaN,
+    },
+  ];
+  const write = connection.transaction(['results', 'overrides'], 'readwrite');
+  const writeDone = new Promise<void>((resolve, reject) => {
+    write.oncomplete = () => resolve();
+    write.onabort = () => reject(write.error);
+  });
+  for (const record of records) write.objectStore('results').put(record);
+  write.objectStore('overrides').put({
+    key: records[0]!.key,
+    verdict: 'invalid',
+    accessed: now,
+    expires: now + 86400000,
+  });
+  await writeDone;
+  expect(await lookup(records.map((record) => record.key))).toEqual({
+    results: [],
+    overrides: {},
+  });
+  const read = connection.transaction(['results', 'overrides']);
+  const remaining = await Promise.all(
+    records.map(
+      (record) =>
+        new Promise<unknown>((resolve) => {
+          const request = read.objectStore('results').get(record.key);
+          request.onsuccess = () => resolve(request.result);
+        }),
+    ),
+  );
+  expect(remaining).toEqual([undefined, undefined, undefined]);
+  const override = await new Promise<unknown>((resolve) => {
+    const request = connection
+      .transaction('overrides')
+      .objectStore('overrides')
+      .get(records[0]!.key);
+    request.onsuccess = () => resolve(request.result);
+  });
+  expect(override).toBeUndefined();
+  connection.close();
+});
