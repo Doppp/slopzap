@@ -34,3 +34,37 @@ test('YouTube video changes are separate route sessions', () => {
   const b = new URL('https://www.youtube.com/watch?v=two');
   expect(adapterFor(a)!.routeKey(a)).not.toBe(adapterFor(b)!.routeKey(b));
 });
+test('authentication and challenge routes are inert without blocking public sign-in topics', () => {
+  for (const origin of [
+    'https://www.reddit.com',
+    'https://www.youtube.com',
+    'https://www.linkedin.com',
+    'https://x.com',
+    'https://medium.com',
+  ])
+    for (const path of [
+      '/login',
+      '/signin/',
+      '/sign-in',
+      '/signup',
+      '/sign-up',
+      '/authwall',
+      '/challenge',
+      '/checkpoint/challenge',
+      '/uas/login',
+      '/i/flow/login',
+      '/i/flow/signup',
+      '/account/login',
+      '/m/signin',
+    ])
+      expect(adapterFor(new URL(origin + path))).toBeUndefined();
+  expect(
+    adapterFor(
+      new URL('https://www.reddit.com/r/login/comments/invented/topic/'),
+    )?.platform,
+  ).toBe('reddit');
+  expect(
+    adapterFor(new URL('https://medium.com/@invented/sign-in-design-invented'))
+      ?.platform,
+  ).toBe('medium');
+});
