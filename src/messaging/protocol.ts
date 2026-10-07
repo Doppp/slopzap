@@ -15,6 +15,17 @@ export function validResult(value: unknown): value is Result {
   if (!value || typeof value !== 'object') return false;
   const r = value as Result;
   return (
+    Object.keys(r).every((key) =>
+      [
+        'fingerprint',
+        'status',
+        'score',
+        'evidence',
+        'reasons',
+        'version',
+        'automaticHide',
+      ].includes(key),
+    ) &&
     keyValid(r.fingerprint) &&
     ['classified', 'insufficient_evidence'].includes(r.status) &&
     Number.isFinite(r.score) &&
@@ -25,8 +36,12 @@ export function validResult(value: unknown): value is Result {
     r.evidence <= 1 &&
     Array.isArray(r.reasons) &&
     r.reasons.length <= 5 &&
-    r.reasons.every(
-      (reason) => typeof reason === 'string' && reason.length < 80,
+    r.reasons.every((reason) =>
+      [
+        'Generic engagement',
+        'Formulaic wording',
+        'Repeats parent context',
+      ].includes(reason),
     ) &&
     typeof r.version === 'string' &&
     r.version.length < 80 &&

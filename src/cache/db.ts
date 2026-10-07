@@ -12,13 +12,16 @@ interface RecordValue {
 let opened: Promise<IDBDatabase> | undefined;
 function db(): Promise<IDBDatabase> {
   opened ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open('slopzap', 1);
+    const request = indexedDB.open('slopzap', 2);
     request.onupgradeneeded = () => {
       for (const name of ['results', 'overrides']) {
-        const store = request.result.createObjectStore(name, {
-          keyPath: 'key',
-        });
-        store.createIndex('accessed', 'accessed');
+        const store = request.result.objectStoreNames.contains(name)
+          ? request.transaction!.objectStore(name)
+          : request.result.createObjectStore(name, { keyPath: 'key' });
+        if (!store.indexNames.contains('accessed'))
+          store.createIndex('accessed', 'accessed');
+        if (!store.indexNames.contains('expires'))
+          store.createIndex('expires', 'expires');
       }
     };
     request.onsuccess = () => {
@@ -57,7 +60,11 @@ export async function lookup(
   keys: string[],
 ): Promise<{ results: Result[]; overrides: Record<string, Verdict> }> {
   const connection = await db();
-  const transaction = connection.transaction(['results', 'overrides']);
+  const transaction = connection.transaction(
+    ['results', 'overrides'],
+    'readwrite',
+  );
+  const completion = completed(transaction);
   const now = Date.now();
   const values = await Promise.all(
     keys.map(async (key) => {
@@ -69,6 +76,15 @@ export async function lookup(
           RecordValue | undefined
         >,
       ]);
+      for (const [name, record] of [
+        ['results', result],
+        ['overrides', override],
+      ] as const)
+        if (record) {
+          if (record.expires <= now) transaction.objectStore(name).delete(key);
+          else if (now - record.accessed > 3600000)
+            transaction.objectStore(name).put({ ...record, accessed: now });
+        }
       return {
         key,
         result:
@@ -82,6 +98,7 @@ export async function lookup(
       };
     }),
   );
+  await completion;
   return {
     results: values.flatMap((value) => (value.result ? [value.result] : [])),
     overrides: Object.fromEntries(
@@ -104,7 +121,7 @@ export async function save(results: Result[]): Promise<void> {
         Date.now() + (result.status === 'classified' ? TTL : 7 * 86400000),
     } satisfies RecordValue);
   await completion;
-  await evict();
+  await evict('results', MAX_RECORDS);
 }
 export async function override(key: string, verdict: Verdict): Promise<void> {
   const connection = await db();
@@ -117,6 +134,7 @@ export async function override(key: string, verdict: Verdict): Promise<void> {
     expires: Date.now() + 365 * 86400000,
   } satisfies RecordValue);
   await completion;
+  await evict('overrides', 5000);
 }
 export async function clear(store: 'results' | 'overrides'): Promise<void> {
   const transaction = (await db()).transaction(store, 'readwrite');
@@ -124,14 +142,27 @@ export async function clear(store: 'results' | 'overrides'): Promise<void> {
   transaction.objectStore(store).clear();
   await completion;
 }
-async function evict(): Promise<void> {
+async function evict(
+  name: 'results' | 'overrides',
+  maximum: number,
+): Promise<void> {
   const connection = await db();
-  const transaction = connection.transaction('results', 'readwrite');
+  const transaction = connection.transaction(name, 'readwrite');
   const completion = completed(transaction);
-  const store = transaction.objectStore('results');
+  const store = transaction.objectStore(name);
+  const expired = store
+    .index('expires')
+    .openCursor(IDBKeyRange.upperBound(Date.now()));
+  expired.onsuccess = () => {
+    const entry = expired.result;
+    if (entry) {
+      entry.delete();
+      entry.continue();
+    }
+  };
   const count = await requestValue(store.count());
-  if (count > MAX_RECORDS) {
-    let remaining = count - Math.floor(MAX_RECORDS * 0.8);
+  if (count > maximum) {
+    let remaining = count - Math.floor(maximum * 0.8);
     const cursor = store.index('accessed').openCursor();
     cursor.onsuccess = () => {
       const entry = cursor.result;
