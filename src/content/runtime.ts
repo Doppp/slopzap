@@ -251,7 +251,17 @@ export class Runtime {
         subtree: true,
         characterData: true,
         attributes: true,
-        attributeFilter: ['thingid', 'data-urn', 'data-id', 'data-tweet-id'],
+        attributeFilter: [
+          'thingid',
+          'data-urn',
+          'data-id',
+          'data-tweet-id',
+          'data-comment-id',
+          'data-post-id',
+          'data-fullname',
+          'id',
+          'href',
+        ],
       });
       this.dirty.push(root);
     }

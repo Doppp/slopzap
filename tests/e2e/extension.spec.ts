@@ -193,6 +193,144 @@ for (const scenario of [
     }
   });
 
+for (const scenario of [
+  {
+    platform: 'youtube',
+    url: 'https://www.youtube.com/watch?v=invented',
+    root: 'ytd-comments',
+    unit: 'ytd-comment-view-model[data-comment-id="top"]',
+    body: '#content-text',
+    count: 2,
+  },
+  {
+    platform: 'linkedin',
+    url: 'https://www.linkedin.com/feed/',
+    root: 'main',
+    unit: '.comments-comment-item[data-id="reply"]',
+    body: '.comments-comment-item__main-content',
+    count: 3,
+  },
+  {
+    platform: 'x',
+    url: 'https://x.com/home',
+    root: 'main',
+    unit: 'article[data-tweet-id="reply"]',
+    body: '[data-testid="tweetText"]',
+    count: 2,
+  },
+  {
+    platform: 'medium',
+    url: 'https://medium.com/invented/story',
+    root: 'main',
+    unit: '[data-post-id="response"]',
+    body: '[data-testid="responseContent"]',
+    count: 2,
+  },
+])
+  test(`${scenario.platform} handles expansion insertion edits recycling removal and private navigation`, async () => {
+    const html = await readFile(
+      `fixtures/${scenario.platform}/thread.html`,
+      'utf8',
+    );
+    await context.route(`${new URL(scenario.url).origin}/**`, (route) =>
+      route.fulfill({ contentType: 'text/html', body: html }),
+    );
+    await page.goto(scenario.url);
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(scenario.count);
+    await page.evaluate(({ root, unit, body }) => {
+      const clone = document
+        .querySelector(unit)!
+        .cloneNode(true) as HTMLElement;
+      clone
+        .querySelectorAll('[data-slopzap-ui]')
+        .forEach((node) => node.remove());
+      clone.dataset.recycledFixture = 'true';
+      for (const attribute of [
+        'data-id',
+        'data-urn',
+        'data-comment-id',
+        'data-tweet-id',
+        'data-post-id',
+      ])
+        if (clone.hasAttribute(attribute))
+          clone.setAttribute(attribute, 'invented-dynamic');
+      clone.querySelector(body)!.textContent =
+        'My team tested this invented configuration yesterday and measured a latency improvement because the cache was warm.';
+      document.querySelector(root)!.append(clone);
+    }, scenario);
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(
+      scenario.count + 1,
+    );
+    const clone = page.locator('[data-recycled-fixture]');
+    await clone
+      .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+      .click();
+    await mode('Slop Blocker');
+    await expect(clone.locator(scenario.body)).toBeHidden();
+    await clone
+      .locator(scenario.body)
+      .evaluate(
+        (node) =>
+          (node.textContent =
+            'I tested the revised invented configuration today because the earlier measurement used a cold cache and was not representative.'),
+      );
+    await expect(clone.locator(scenario.body)).toBeVisible();
+    await clone
+      .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+      .click();
+    await expect(clone.locator(scenario.body)).toBeHidden();
+    await clone.evaluate((node) => {
+      for (const attribute of [
+        'data-id',
+        'data-urn',
+        'data-comment-id',
+        'data-tweet-id',
+        'data-post-id',
+      ])
+        if (node.hasAttribute(attribute))
+          node.setAttribute(attribute, 'invented-recycled');
+    });
+    await expect(clone.locator(scenario.body)).toBeVisible();
+    await expect(
+      clone.getByRole('button', { name: 'SlopZap: Slop', exact: true }),
+    ).toBeVisible();
+    await clone.evaluate((node) => node.remove());
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(scenario.count);
+    await page.evaluate(() => history.pushState({}, '', '/messages/inbox'));
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
+  });
+
+test('deep Reddit branches preserve all ancestor context and release removed bindings', async () => {
+  await page.evaluate(() => {
+    let parent: Element = document.querySelector('main')!;
+    for (let index = 0; index < 30; index++) {
+      const comment = document.createElement('shreddit-comment');
+      comment.setAttribute('thingid', `deep-${index}`);
+      const body = document.createElement('div');
+      body.slot = 'comment';
+      body.textContent = `I measured this invented configuration yesterday because the cache was warm. Measurement number ${index}.`;
+      comment.append(body);
+      parent.append(comment);
+      parent = comment;
+    }
+  });
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(33);
+  const leaf = page.locator('shreddit-comment[thingid="deep-29"]');
+  await leaf
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Only');
+  await expect(
+    page.locator('shreddit-comment[thingid="deep-0"] > [data-slopzap-ui]'),
+  ).toContainText('Parent context');
+  await expect(leaf.locator('[slot="comment"]')).toBeVisible();
+  await page
+    .locator('shreddit-comment[thingid="deep-0"]')
+    .evaluate((node) => node.remove());
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(3);
+});
+
 test('edited text invalidates the exact-item correction', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const reply = page.locator('shreddit-comment[thingid="reply-1"]');
@@ -323,6 +461,47 @@ test('model preparation shows progress and can be cancelled without enabling a p
   await expect(
     options.getByRole('button', { name: 'Enable Chrome on-device AI' }),
   ).toBeEnabled();
+});
+
+test('injected keyboard feedback retains focus; forced colors and enlarged UI stay accessible', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .focus();
+  await page.keyboard.press('Enter');
+  await expect(
+    reply.getByRole('button', { name: 'SlopZap: Slop', exact: true }),
+  ).toBeFocused();
+  await mode('Slop Blocker');
+  const show = reply.getByRole('button', {
+    name: 'SlopZap: Show',
+    exact: true,
+  });
+  await show.focus();
+  await page.keyboard.press('Enter');
+  await expect(
+    reply.getByRole('button', { name: 'SlopZap: Hide', exact: true }),
+  ).toBeFocused();
+  await expect(reply.locator('[slot="comment"]')).toBeVisible();
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  await options.emulateMedia({
+    forcedColors: 'active',
+    reducedMotion: 'reduce',
+  });
+  await options.evaluate(
+    () => (document.documentElement.style.fontSize = '200%'),
+  );
+  expect(
+    (await new AxeBuilder({ page: options }).analyze()).violations,
+  ).toEqual([]);
+  await options.screenshot({
+    path: 'test-results/options-accessibility.png',
+    fullPage: true,
+  });
 });
 
 test('mode switches and a reload reuse cached scores without inference', async () => {
