@@ -3,13 +3,20 @@
   "date": "2026-10-07",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 52, "chromium": 31 },
+  "automatedTests": { "unit": 55, "chromium": 32 },
+  "messageAndCacheHardening": {
+    "malformedMessageRegressionsPassed": true,
+    "corruptCacheRegressionsPassed": true,
+    "permissionsAdded": false,
+    "manualSecuritySignoff": false
+  },
   "packagedFileReproducibility": {
     "passed": true,
     "files": 22,
     "zipByteEqualityClaimed": false
   },
   "shortBenchmark": {
+    "scope": "prior milestone build; not final-head reference acceptance",
     "scenarios": 12,
     "units": [100, 500, 1000],
     "cpuRates": [1, 4],

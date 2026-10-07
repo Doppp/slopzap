@@ -22,7 +22,9 @@ SlopZap has a tested development alpha with onboarding, five fixture-tested adap
 
 ## Current external checks
 
-The local development verification completed 52 unit tests and 31 Chromium tests, a twelve-scenario enabled/disabled-processing benchmark matrix, and reproducible packaged-file hashes. A 1,000-unit virtualization diagnostic ran for 1,800.54 seconds; the last recorded post-GC heap sample at 1,740 seconds was 99.4% of the ten-minute sample, with zero remaining runtime bindings after cleanup. This was a development build captured at run start, not a final-head paired reference-machine acceptance. Aggregate results are recorded in `docs/verification-results.json`.
+The latest local development verification passed 55 unit tests and 32 Chromium tests. Message-boundary regressions cover malformed batches and control messages without preference changes; cache regressions reject corrupt corrections, mismatched fingerprints and undeclared stored fields. These checks do not replace the manual security signoff.
+
+The earlier milestone build completed a twelve-scenario enabled/disabled-processing benchmark matrix and reproducible packaged-file hashes. A 1,000-unit virtualization diagnostic ran for 1,800.54 seconds; the last recorded post-GC heap sample at 1,740 seconds was 99.4% of the ten-minute sample, with zero remaining runtime bindings after cleanup. This was a development build captured at run start, not a final-head paired reference-machine acceptance. Aggregate results are recorded in `docs/verification-results.json`.
 
 A disposable-profile probe of installed Chrome 155 did not load the unpacked extension through automated command-line flags. No model download was started, and this result does not establish model capability on the machine. Real-model verification requires a normal permitted developer installation and the independent quality corpus.
 

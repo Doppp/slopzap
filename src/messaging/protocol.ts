@@ -1,4 +1,10 @@
-import type { Result, Verdict, Unit } from '../shared/types';
+import {
+  DEFAULT_SETTINGS,
+  type Result,
+  type Verdict,
+  type Unit,
+  type Settings,
+} from '../shared/types';
 import { validChoices, type OnboardingChoices } from '../state/onboarding';
 
 export type Request =
@@ -12,11 +18,74 @@ export type Request =
   | { type: 'OVERRIDE'; key: string; verdict: Verdict }
   | { type: 'CACHE_CLEAR'; store: 'results' | 'overrides' };
 
+export type ContentRequest =
+  | { type: 'SNAPSHOT' }
+  | { type: 'RETRY_ADAPTER' }
+  | { type: 'SETTINGS_CHANGED'; settings: Settings };
+
 const keyValid = (key: unknown): key is string =>
   typeof key === 'string' && /^[a-f0-9]{64}$/.test(key);
+const record = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+const fields = (value: Record<string, unknown>, allowed: string[]) =>
+  Object.keys(value).every((key) => allowed.includes(key));
+function boundedRecord(value: unknown): value is Record<string, unknown> {
+  if (!record(value)) return false;
+  try {
+    return (
+      new TextEncoder().encode(JSON.stringify(value)).byteLength <= 256_000
+    );
+  } catch {
+    return false;
+  }
+}
+function validSettings(value: unknown): value is Settings {
+  if (!record(value) || !record(value.sites)) return false;
+  const bounded = (number: unknown, min: number) =>
+    typeof number === 'number' &&
+    Number.isFinite(number) &&
+    number >= min &&
+    number <= 0.95;
+  return (
+    fields(value, [
+      'debug',
+      'onDevice',
+      'enabled',
+      'mode',
+      'blockerThreshold',
+      'onlyThreshold',
+      'sites',
+    ]) &&
+    typeof value.debug === 'boolean' &&
+    typeof value.onDevice === 'boolean' &&
+    typeof value.enabled === 'boolean' &&
+    typeof value.mode === 'string' &&
+    ['normal', 'goggles', 'blocker', 'only'].includes(value.mode) &&
+    bounded(value.blockerThreshold, 0.75) &&
+    bounded(value.onlyThreshold, 0.5) &&
+    fields(value.sites, Object.keys(DEFAULT_SETTINGS.sites)) &&
+    Object.keys(DEFAULT_SETTINGS.sites).every(
+      (site) =>
+        typeof (value.sites as Record<string, unknown>)[site] === 'boolean',
+    )
+  );
+}
+
+export function parseContentRequest(value: unknown): ContentRequest | null {
+  if (!boundedRecord(value)) return null;
+  if (value.type === 'SNAPSHOT' || value.type === 'RETRY_ADAPTER')
+    return fields(value, ['type']) ? { type: value.type } : null;
+  if (
+    value.type === 'SETTINGS_CHANGED' &&
+    fields(value, ['type', 'settings']) &&
+    validSettings(value.settings)
+  )
+    return { type: value.type, settings: value.settings };
+  return null;
+}
 export function validResult(value: unknown): value is Result {
-  if (!value || typeof value !== 'object') return false;
-  const r = value as Result;
+  if (!record(value)) return false;
+  const r = value as unknown as Result;
   return (
     Object.keys(r).every((key) =>
       [
@@ -52,57 +121,72 @@ export function validResult(value: unknown): value is Result {
   );
 }
 export function parseRequest(value: unknown): Request | null {
-  if (!value || typeof value !== 'object') return null;
-  try {
-    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 256_000)
-      return null;
-  } catch {
-    return null;
-  }
+  if (!boundedRecord(value)) return null;
   const r = value as Request;
   switch (r.type) {
     case 'CLASSIFY_LOCAL':
-      return Array.isArray(r.items) &&
+      return fields(value, ['type', 'items']) &&
+        Array.isArray(r.items) &&
         r.items.length <= 16 &&
-        r.items.every(
-          (item) => keyValid(item.fingerprint) && validUnit(item.unit),
+        Array.from(r.items).every(
+          (item) =>
+            record(item) &&
+            fields(item, ['unit', 'fingerprint']) &&
+            keyValid(item.fingerprint) &&
+            validUnit(item.unit),
         )
         ? r
         : null;
     case 'SETTINGS_GET':
-      return r;
+      return fields(value, ['type']) ? r : null;
     case 'SETTINGS_SET':
-      return r;
+      return fields(value, ['type', 'settings']) && record(r.settings)
+        ? r
+        : null;
     case 'ONBOARDING_GET':
-      return r;
+      return fields(value, ['type']) ? r : null;
     case 'ONBOARDING_COMPLETE':
-      return r.choices === undefined || validChoices(r.choices) ? r : null;
+      return fields(value, ['type', 'choices']) &&
+        (r.choices === undefined || validChoices(r.choices))
+        ? r
+        : null;
     case 'CACHE_GET':
-      return Array.isArray(r.keys) &&
+      return fields(value, ['type', 'keys', 'version']) &&
+        (r.version === undefined ||
+          (typeof r.version === 'string' &&
+            r.version.length > 0 &&
+            r.version.length < 80)) &&
+        Array.isArray(r.keys) &&
         r.keys.length <= 50 &&
-        r.keys.every(keyValid)
+        Array.from(r.keys).every(keyValid)
         ? r
         : null;
     case 'CACHE_SAVE':
-      return Array.isArray(r.results) &&
+      return fields(value, ['type', 'results']) &&
+        Array.isArray(r.results) &&
         r.results.length <= 50 &&
-        r.results.every(validResult)
+        Array.from(r.results).every(validResult)
         ? r
         : null;
     case 'OVERRIDE':
-      return keyValid(r.key) && ['slop', 'not_slop'].includes(r.verdict)
+      return fields(value, ['type', 'key', 'verdict']) &&
+        keyValid(r.key) &&
+        ['slop', 'not_slop'].includes(r.verdict)
         ? r
         : null;
     case 'CACHE_CLEAR':
-      return ['results', 'overrides'].includes(r.store) ? r : null;
+      return fields(value, ['type', 'store']) &&
+        ['results', 'overrides'].includes(r.store)
+        ? r
+        : null;
     default:
       return null;
   }
 }
 
 export function validUnit(value: unknown): value is Unit {
-  if (!value || typeof value !== 'object') return false;
-  const unit = value as Unit;
+  if (!record(value)) return false;
+  const unit = value as unknown as Unit;
   return (
     Object.keys(unit).every((key) =>
       [
