@@ -48,16 +48,16 @@ export function validResult(value: unknown): value is Result {
     ) &&
     typeof r.version === 'string' &&
     r.version.length < 80 &&
-    typeof r.automaticHide === 'boolean'
+    r.automaticHide === false
   );
 }
 export function parseRequest(value: unknown): Request | null {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    JSON.stringify(value).length > 256_000
-  )
+  if (!value || typeof value !== 'object') return null;
+  try {
+    if (JSON.stringify(value).length > 256_000) return null;
+  } catch {
     return null;
+  }
   const r = value as Request;
   switch (r.type) {
     case 'CLASSIFY_LOCAL':
@@ -99,10 +99,22 @@ export function parseRequest(value: unknown): Request | null {
   }
 }
 
-function validUnit(value: unknown): value is Unit {
+export function validUnit(value: unknown): value is Unit {
   if (!value || typeof value !== 'object') return false;
   const unit = value as Unit;
   return (
+    Object.keys(unit).every((key) =>
+      [
+        'platform',
+        'kind',
+        'id',
+        'parentId',
+        'text',
+        'parentText',
+        'rootText',
+        'quotedText',
+      ].includes(key),
+    ) &&
     ['reddit', 'youtube', 'linkedin', 'x', 'medium', 'synthetic'].includes(
       unit.platform,
     ) &&
@@ -116,9 +128,15 @@ function validUnit(value: unknown): value is Unit {
     ].includes(unit.kind) &&
     typeof unit.id === 'string' &&
     unit.id.length <= 500 &&
-    (unit.parentId === null || typeof unit.parentId === 'string') &&
-    [unit.text, unit.parentText, unit.rootText, unit.quotedText].every(
-      (text) => typeof text === 'string' && text.length <= 12000,
-    )
+    (unit.parentId === null ||
+      (typeof unit.parentId === 'string' && unit.parentId.length <= 500)) &&
+    typeof unit.text === 'string' &&
+    unit.text.length <= 12000 &&
+    typeof unit.parentText === 'string' &&
+    unit.parentText.length <= 800 &&
+    typeof unit.rootText === 'string' &&
+    unit.rootText.length <= 500 &&
+    typeof unit.quotedText === 'string' &&
+    unit.quotedText.length <= 600
   );
 }
