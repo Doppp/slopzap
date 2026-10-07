@@ -1,0 +1,1135 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-08",
+  "sourceCommit": "9af2c09c2d0718470aaaf4051b69b4b41d4a345a",
+  "executionContext": "packaged extension comparison page in an isolated windowed installed-Chrome profile",
+  "installationMethod": "Chrome DevTools Extensions.loadUnpacked over private debugging pipe; developer extension loading only, no model eligibility overrides",
+  "modelPreparation": {
+    "explicitSettingsAction": true,
+    "completed": true,
+    "browsingAnalysisDisabledBeforeComparisons": true,
+    "isolatedProfileAndDownloadedModelRemovedAfterRuns": true
+  },
+  "scope": "three repetitions of the same 12 invented cases and author-intended labels; not 36 independent cases or release acceptance",
+  "referenceBenefitEstablished": false,
+  "resourceAcceptance": false,
+  "releaseReady": false,
+  "automaticHide": false,
+  "validOutputTimingDiagnostic": {
+    "baseline": {
+      "validOutputs": 36,
+      "medianMs": 1889.05,
+      "p95Ms": 2563.7,
+      "maxMs": 2641.6
+    },
+    "guided": {
+      "validOutputs": 31,
+      "medianMs": 2213.7,
+      "p95Ms": 4776.1,
+      "maxMs": 4938.3
+    }
+  },
+  "runs": [
+    {
+      "run": 1,
+      "report": {
+        "schemaVersion": 1,
+        "protocolVersion": "paired-reference-comparison-v1",
+        "status": "incomplete",
+        "scope": "invented development comparison; not independent accuracy or release evidence",
+        "corpusVersion": "invented-comparison-v1",
+        "classifierVersion": "provisional-features-v4:reference-guide-v1",
+        "guidedPromptVersion": "provisional-features-v4:reference-guide-v1:chrome-prompt-v3",
+        "referenceVersion": "reference-guide-v1",
+        "modelSnapshot": "not exposed or pinned by this experiment",
+        "releaseReady": false,
+        "automaticHide": false,
+        "plannedCases": 12,
+        "pairedCases": 11,
+        "attemptedCalls": 24,
+        "metrics": [
+          {
+            "threshold": 0.7,
+            "baseline": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 1,
+                "tn": 4,
+                "fn": 1,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 0.8333333333333334,
+                "recall": 0.8333333333333334,
+                "fpr": 0.2,
+                "fnr": 0.16666666666666666
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 0,
+                "tn": 5,
+                "fn": 1,
+                "abstained": 5,
+                "coverage": 0.5454545454545454,
+                "precision": 1,
+                "recall": 0.8333333333333334,
+                "fpr": 0,
+                "fnr": 0.16666666666666666
+              }
+            },
+            "guided": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 6,
+                "fp": 2,
+                "tn": 3,
+                "fn": 0,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 0.75,
+                "recall": 1,
+                "fpr": 0.4,
+                "fnr": 0
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 0,
+                "tn": 5,
+                "fn": 1,
+                "abstained": 5,
+                "coverage": 0.5454545454545454,
+                "precision": 1,
+                "recall": 0.8333333333333334,
+                "fpr": 0,
+                "fnr": 0.16666666666666666
+              }
+            }
+          },
+          {
+            "threshold": 0.85,
+            "baseline": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 5,
+                "fn": 6,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 5,
+                "fn": 6,
+                "abstained": 5,
+                "coverage": 0.5454545454545454,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              }
+            },
+            "guided": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 1,
+                "fp": 0,
+                "tn": 5,
+                "fn": 5,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 1,
+                "recall": 0.16666666666666666,
+                "fpr": 0,
+                "fnr": 0.8333333333333334
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 5,
+                "fn": 6,
+                "abstained": 5,
+                "coverage": 0.5454545454545454,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              }
+            }
+          }
+        ],
+        "rows": [
+          {
+            "caseId": "reddit-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.8,
+              "composedScore": 0.637,
+              "elapsedMs": 2171.4
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.7,
+              "composedScore": 0.6054999999999999,
+              "elapsedMs": 2289.9
+            }
+          },
+          {
+            "caseId": "reddit-answer",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1887.5
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.75,
+              "composedScore": null,
+              "elapsedMs": 1973.3
+            }
+          },
+          {
+            "caseId": "reddit-quotation",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.75,
+              "composedScore": null,
+              "elapsedMs": 1848.6
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": null,
+              "elapsedMs": 2237
+            }
+          },
+          {
+            "caseId": "youtube-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.6,
+              "composedScore": 0.7355,
+              "elapsedMs": 1865.3
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": 0.7905,
+              "elapsedMs": 2282.8
+            }
+          },
+          {
+            "caseId": "youtube-question",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1831.1
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 2068.2
+            }
+          },
+          {
+            "caseId": "youtube-paraphrase",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.7515,
+              "elapsedMs": 1903.9
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.85,
+              "evidence": 0.8,
+              "composedScore": 0.8215,
+              "elapsedMs": 2272.5
+            }
+          },
+          {
+            "caseId": "linkedin-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": 0.744,
+              "elapsedMs": 1829.4
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": 0.741,
+              "elapsedMs": 2047.9
+            }
+          },
+          {
+            "caseId": "linkedin-caveat",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1847.3
+            },
+            "guided": {
+              "status": "missing",
+              "score": null,
+              "evidence": null,
+              "composedScore": null,
+              "elapsedMs": 3138.9
+            }
+          },
+          {
+            "caseId": "x-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": 0.7905,
+              "elapsedMs": 1858.1
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.75,
+              "composedScore": 0.7905,
+              "elapsedMs": 2125.7
+            }
+          },
+          {
+            "caseId": "x-sarcasm",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": null,
+              "elapsedMs": 1808.7
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": null,
+              "elapsedMs": 1847.9
+            }
+          },
+          {
+            "caseId": "medium-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.7769999999999999,
+              "elapsedMs": 1954
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.7,
+              "composedScore": 0.7629999999999999,
+              "elapsedMs": 2348.3
+            }
+          },
+          {
+            "caseId": "medium-specific",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1849
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1939.2
+            }
+          }
+        ],
+        "extensionVersion": "0.1.0",
+        "chromeMajorVersion": "155"
+      }
+    },
+    {
+      "run": 2,
+      "report": {
+        "schemaVersion": 1,
+        "protocolVersion": "paired-reference-comparison-v1",
+        "status": "incomplete",
+        "scope": "invented development comparison; not independent accuracy or release evidence",
+        "corpusVersion": "invented-comparison-v1",
+        "classifierVersion": "provisional-features-v4:reference-guide-v1",
+        "guidedPromptVersion": "provisional-features-v4:reference-guide-v1:chrome-prompt-v3",
+        "referenceVersion": "reference-guide-v1",
+        "modelSnapshot": "not exposed or pinned by this experiment",
+        "releaseReady": false,
+        "automaticHide": false,
+        "plannedCases": 12,
+        "pairedCases": 9,
+        "attemptedCalls": 24,
+        "metrics": [
+          {
+            "threshold": 0.7,
+            "baseline": {
+              "raw": {
+                "samples": 9,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 2,
+                "tn": 2,
+                "fn": 0,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 0.7142857142857143,
+                "recall": 1,
+                "fpr": 0.5,
+                "fnr": 0
+              },
+              "composed": {
+                "samples": 9,
+                "threshold": 0.7,
+                "tp": 4,
+                "fp": 0,
+                "tn": 4,
+                "fn": 1,
+                "abstained": 4,
+                "coverage": 0.5555555555555556,
+                "precision": 1,
+                "recall": 0.8,
+                "fpr": 0,
+                "fnr": 0.2
+              }
+            },
+            "guided": {
+              "raw": {
+                "samples": 9,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 1,
+                "tn": 3,
+                "fn": 0,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 0.8333333333333334,
+                "recall": 1,
+                "fpr": 0.25,
+                "fnr": 0
+              },
+              "composed": {
+                "samples": 9,
+                "threshold": 0.7,
+                "tp": 4,
+                "fp": 0,
+                "tn": 4,
+                "fn": 1,
+                "abstained": 4,
+                "coverage": 0.5555555555555556,
+                "precision": 1,
+                "recall": 0.8,
+                "fpr": 0,
+                "fnr": 0.2
+              }
+            }
+          },
+          {
+            "threshold": 0.85,
+            "baseline": {
+              "raw": {
+                "samples": 9,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 4,
+                "fn": 5,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              },
+              "composed": {
+                "samples": 9,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 4,
+                "fn": 5,
+                "abstained": 4,
+                "coverage": 0.5555555555555556,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              }
+            },
+            "guided": {
+              "raw": {
+                "samples": 9,
+                "threshold": 0.85,
+                "tp": 3,
+                "fp": 0,
+                "tn": 4,
+                "fn": 2,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 1,
+                "recall": 0.6,
+                "fpr": 0,
+                "fnr": 0.4
+              },
+              "composed": {
+                "samples": 9,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 4,
+                "fn": 5,
+                "abstained": 4,
+                "coverage": 0.5555555555555556,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              }
+            }
+          }
+        ],
+        "rows": [
+          {
+            "caseId": "reddit-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": 0.633,
+              "elapsedMs": 1816.7
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": 0.633,
+              "elapsedMs": 2069.1
+            }
+          },
+          {
+            "caseId": "reddit-answer",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1835.4
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.75,
+              "composedScore": null,
+              "elapsedMs": 1964.2
+            }
+          },
+          {
+            "caseId": "reddit-quotation",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.8,
+              "composedScore": null,
+              "elapsedMs": 2563.7
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 2116.2
+            }
+          },
+          {
+            "caseId": "youtube-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.7769999999999999,
+              "elapsedMs": 1908
+            },
+            "guided": {
+              "status": "missing",
+              "score": null,
+              "evidence": null,
+              "composedScore": null,
+              "elapsedMs": 2112.4
+            }
+          },
+          {
+            "caseId": "youtube-question",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1919.4
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 2321.7
+            }
+          },
+          {
+            "caseId": "youtube-paraphrase",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.85,
+              "composedScore": 0.7164999999999999,
+              "elapsedMs": 1903.6
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.85,
+              "evidence": 0.7,
+              "composedScore": 0.80725,
+              "elapsedMs": 2882.7
+            }
+          },
+          {
+            "caseId": "linkedin-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.7,
+              "composedScore": 0.7135,
+              "elapsedMs": 2641.6
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.8,
+              "composedScore": 0.709,
+              "elapsedMs": 2899.8
+            }
+          },
+          {
+            "caseId": "linkedin-caveat",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1942
+            },
+            "guided": {
+              "status": "missing",
+              "score": null,
+              "evidence": null,
+              "composedScore": null,
+              "elapsedMs": 3736.7
+            }
+          },
+          {
+            "caseId": "x-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": 0.7905,
+              "elapsedMs": 1873.9
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.85,
+              "evidence": 0.8,
+              "composedScore": 0.847,
+              "elapsedMs": 4776.1
+            }
+          },
+          {
+            "caseId": "x-sarcasm",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": null,
+              "elapsedMs": 1916
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": null,
+              "elapsedMs": 1942.6
+            }
+          },
+          {
+            "caseId": "medium-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.7769999999999999,
+              "elapsedMs": 1901
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.85,
+              "evidence": 0.75,
+              "composedScore": 0.8454999999999999,
+              "elapsedMs": 3743.8
+            }
+          },
+          {
+            "caseId": "medium-specific",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1849.3
+            },
+            "guided": {
+              "status": "missing",
+              "score": null,
+              "evidence": null,
+              "composedScore": null,
+              "elapsedMs": 4583.1
+            }
+          }
+        ],
+        "extensionVersion": "0.1.0",
+        "chromeMajorVersion": "155"
+      }
+    },
+    {
+      "run": 3,
+      "report": {
+        "schemaVersion": 1,
+        "protocolVersion": "paired-reference-comparison-v1",
+        "status": "incomplete",
+        "scope": "invented development comparison; not independent accuracy or release evidence",
+        "corpusVersion": "invented-comparison-v1",
+        "classifierVersion": "provisional-features-v4:reference-guide-v1",
+        "guidedPromptVersion": "provisional-features-v4:reference-guide-v1:chrome-prompt-v3",
+        "referenceVersion": "reference-guide-v1",
+        "modelSnapshot": "not exposed or pinned by this experiment",
+        "releaseReady": false,
+        "automaticHide": false,
+        "plannedCases": 12,
+        "pairedCases": 11,
+        "attemptedCalls": 24,
+        "metrics": [
+          {
+            "threshold": 0.7,
+            "baseline": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 1,
+                "tn": 5,
+                "fn": 0,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 0.8333333333333334,
+                "recall": 1,
+                "fpr": 0.16666666666666666,
+                "fnr": 0
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 0,
+                "tn": 6,
+                "fn": 0,
+                "abstained": 6,
+                "coverage": 0.45454545454545453,
+                "precision": 1,
+                "recall": 1,
+                "fpr": 0,
+                "fnr": 0
+              }
+            },
+            "guided": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 4,
+                "tn": 2,
+                "fn": 0,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 0.5555555555555556,
+                "recall": 1,
+                "fpr": 0.6666666666666666,
+                "fnr": 0
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.7,
+                "tp": 5,
+                "fp": 0,
+                "tn": 6,
+                "fn": 0,
+                "abstained": 6,
+                "coverage": 0.45454545454545453,
+                "precision": 1,
+                "recall": 1,
+                "fpr": 0,
+                "fnr": 0
+              }
+            }
+          },
+          {
+            "threshold": 0.85,
+            "baseline": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 6,
+                "fn": 5,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 6,
+                "fn": 5,
+                "abstained": 6,
+                "coverage": 0.45454545454545453,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              }
+            },
+            "guided": {
+              "raw": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 1,
+                "fp": 0,
+                "tn": 6,
+                "fn": 4,
+                "abstained": 0,
+                "coverage": 1,
+                "precision": 1,
+                "recall": 0.2,
+                "fpr": 0,
+                "fnr": 0.8
+              },
+              "composed": {
+                "samples": 11,
+                "threshold": 0.85,
+                "tp": 0,
+                "fp": 0,
+                "tn": 6,
+                "fn": 5,
+                "abstained": 6,
+                "coverage": 0.45454545454545453,
+                "precision": null,
+                "recall": 0,
+                "fpr": 0,
+                "fnr": 1
+              }
+            }
+          }
+        ],
+        "rows": [
+          {
+            "caseId": "reddit-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.6719999999999999,
+              "elapsedMs": 1905.8
+            },
+            "guided": {
+              "status": "missing",
+              "score": null,
+              "evidence": null,
+              "composedScore": null,
+              "elapsedMs": 2090.8
+            }
+          },
+          {
+            "caseId": "reddit-answer",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1939.5
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1909.2
+            }
+          },
+          {
+            "caseId": "reddit-quotation",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1831.9
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": null,
+              "elapsedMs": 2247.1
+            }
+          },
+          {
+            "caseId": "youtube-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": 0.7769999999999999,
+              "elapsedMs": 1967
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.8,
+              "composedScore": 0.742,
+              "elapsedMs": 2213.7
+            }
+          },
+          {
+            "caseId": "youtube-question",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1887.5
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 2158.6
+            }
+          },
+          {
+            "caseId": "youtube-paraphrase",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.7515,
+              "elapsedMs": 1874.4
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.75,
+              "composedScore": 0.75225,
+              "elapsedMs": 2599.9
+            }
+          },
+          {
+            "caseId": "linkedin-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": 0.744,
+              "elapsedMs": 1914.4
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.7,
+              "composedScore": 0.7135,
+              "elapsedMs": 4938.3
+            }
+          },
+          {
+            "caseId": "linkedin-caveat",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.6,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1880.6
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": null,
+              "elapsedMs": 2250.7
+            }
+          },
+          {
+            "caseId": "x-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.7,
+              "composedScore": 0.7629999999999999,
+              "elapsedMs": 1921
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.7,
+              "evidence": 0.6,
+              "composedScore": 0.7629999999999999,
+              "elapsedMs": 2118.5
+            }
+          },
+          {
+            "caseId": "x-sarcasm",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.8,
+              "composedScore": null,
+              "elapsedMs": 1840.8
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": null,
+              "elapsedMs": 1923.5
+            }
+          },
+          {
+            "caseId": "medium-filler",
+            "label": 1,
+            "baseline": {
+              "status": "ok",
+              "score": 0.75,
+              "evidence": 0.85,
+              "composedScore": 0.7769999999999999,
+              "elapsedMs": 1915.3
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.85,
+              "evidence": 0.75,
+              "composedScore": 0.8454999999999999,
+              "elapsedMs": 2387.3
+            }
+          },
+          {
+            "caseId": "medium-specific",
+            "label": 0,
+            "baseline": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.7,
+              "composedScore": null,
+              "elapsedMs": 1890.6
+            },
+            "guided": {
+              "status": "ok",
+              "score": 0.65,
+              "evidence": 0.75,
+              "composedScore": null,
+              "elapsedMs": 1969.6
+            }
+          }
+        ],
+        "extensionVersion": "0.1.0",
+        "chromeMajorVersion": "155"
+      }
+    }
+  ]
+}
