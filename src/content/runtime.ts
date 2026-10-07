@@ -34,6 +34,7 @@ export class Runtime {
   private generation = 0;
   private worker: LocalClassifier | undefined;
   private mutation: MutationObserver | undefined;
+  private roots: HTMLElement[] = [];
   private intersection: IntersectionObserver | undefined;
   private entries = new Map<HTMLElement, Entry>();
   private candidates = new Set<HTMLElement>();
@@ -97,13 +98,20 @@ export class Runtime {
   private checkRoute = (): void => {
     if (document.visibilityState === 'hidden') return;
     const url = new URL(location.href);
-    const route = `${url.origin}${url.pathname}`;
-    if (route === this.route && this.mutation) return;
+    const adapter = adapterFor(url);
+    const route = adapter?.routeKey(url) ?? `${url.origin}${url.pathname}`;
+    if (
+      route === this.route &&
+      this.mutation &&
+      this.roots.every((root) => root.isConnected)
+    )
+      return;
+    if (this.mutation && !this.roots.every((root) => root.isConnected))
+      this.cleanupRoute();
     if (route !== this.route) {
       this.cleanupRoute();
       this.route = route;
     }
-    const adapter = adapterFor(url);
     if (
       !this.settings.enabled ||
       !adapter ||
@@ -120,6 +128,7 @@ export class Runtime {
         !all.some((other) => other !== node && other.contains(node)),
     );
     if (!roots.length) return;
+    this.roots = roots;
     this.adapter = adapter;
     this.worker = new LocalClassifier();
     this.intersection = new IntersectionObserver(
@@ -148,10 +157,23 @@ export class Runtime {
         for (const added of record.addedNodes)
           if (!(added instanceof Element && added.matches('[data-slopzap-ui]')))
             this.dirty.push(added);
-        if (record.type !== 'childList') {
+        const nativeChange =
+          record.type !== 'childList' ||
+          [...record.addedNodes, ...record.removedNodes].some(
+            (node) =>
+              !(node instanceof Element && node.matches('[data-slopzap-ui]')),
+          );
+        if (nativeChange) {
           const candidate = target?.closest<HTMLElement>(adapter.candidates);
-          if (candidate && this.eligible.has(candidate))
+          if (candidate && this.eligible.has(candidate)) {
             this.queue.add(candidate);
+            for (const [node, entry] of this.entries)
+              if (
+                entry.binding.parentContainer === candidate &&
+                this.eligible.has(node)
+              )
+                this.queue.add(node);
+          }
         }
       }
       if (this.dirty.length) this.scheduleDiscovery();
@@ -231,12 +253,18 @@ export class Runtime {
           this.entries.delete(node);
           continue;
         }
+        const parentEntry = binding.parentContainer
+          ? this.entries.get(binding.parentContainer)
+          : undefined;
+        if (parentEntry)
+          binding.unit.parentText = parentEntry.binding.unit.text.slice(0, 800);
         const key = await fingerprint(binding.unit, this.route);
         if (generation !== this.generation) return;
         if (old?.fingerprint === key && old.result) {
           work.push(old);
           continue;
         }
+        if (old) this.history.delete(old.fingerprint);
         const entry: Entry = {
           binding,
           key: `unit-${++this.sequence}`,
@@ -328,9 +356,7 @@ export class Runtime {
     }
   }
   private scored(entry: Entry): ScoredItem {
-    const parent = entry.binding.container.parentElement?.closest<HTMLElement>(
-      this.adapter?.candidates ?? '[data-no-match]',
-    );
+    const parent = entry.binding.parentContainer;
     return {
       key: entry.key,
       parent: parent ? (this.entries.get(parent)?.key ?? null) : null,
@@ -390,6 +416,7 @@ export class Runtime {
     this.intersection?.disconnect();
     this.worker?.close();
     this.mutation = undefined;
+    this.roots = [];
     this.intersection = undefined;
     this.worker = undefined;
     if (this.discoveryTimer !== undefined) clearTimeout(this.discoveryTimer);

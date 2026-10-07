@@ -90,3 +90,75 @@ test('dynamic insertions, removals and SPA navigation do not retain stale UI', a
   await page.evaluate(() => history.pushState({}, '', '/messages/inbox'));
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
 });
+
+for (const scenario of [
+  {
+    platform: 'youtube',
+    url: 'https://www.youtube.com/watch?v=invented',
+    count: 2,
+  },
+  { platform: 'linkedin', url: 'https://www.linkedin.com/feed/', count: 3 },
+  { platform: 'x', url: 'https://x.com/home', count: 2 },
+  { platform: 'medium', url: 'https://medium.com/invented/story', count: 2 },
+])
+  test(`${scenario.platform} extracts independent authored units and excludes composers`, async () => {
+    const html = await readFile(
+      `fixtures/${scenario.platform}/thread.html`,
+      'utf8',
+    );
+    await context.route(`${new URL(scenario.url).origin}/**`, (route) =>
+      route.fulfill({ contentType: 'text/html', body: html }),
+    );
+    await page.goto(scenario.url);
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(scenario.count);
+    await expect(page.locator('form [data-slopzap-ui]')).toHaveCount(0);
+    if (scenario.platform === 'x')
+      await expect(
+        page.locator('[data-testid="quoteTweet"] [data-slopzap-ui]'),
+      ).toHaveCount(0);
+  });
+
+test('edited text invalidates the exact-item correction', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  await expect(reply.locator('[slot="comment"]')).toBeHidden();
+  await reply.locator('[slot="comment"]').evaluate((node) => {
+    node.textContent =
+      'I tested the cache configuration yesterday and measured a concrete improvement from forty seconds to twenty seconds.';
+  });
+  await expect(reply.locator('[slot="comment"]')).toBeVisible();
+});
+
+test('a thousand loaded comments do not trigger eager inference', async () => {
+  await page.evaluate(() => {
+    const main = document.querySelector('main')!;
+    main.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < 1000; index++) {
+      const comment = document.createElement('shreddit-comment');
+      comment.setAttribute('thingid', `item-${index}`);
+      comment.style.display = 'block';
+      comment.style.minHeight = '140px';
+      const body = document.createElement('div');
+      body.setAttribute('slot', 'comment');
+      body.textContent = `I tested this configuration yesterday and measured ${index} milliseconds of latency in the build.`;
+      comment.append(body);
+      fragment.append(comment);
+    }
+    main.append(fragment);
+  });
+  await expect
+    .poll(() => page.locator('[data-slopzap-ui]').count())
+    .toBeGreaterThan(3);
+  expect(await page.locator('[data-slopzap-ui]').count()).toBeLessThan(40);
+  await page
+    .locator('shreddit-comment[thingid="item-500"]')
+    .scrollIntoViewIfNeeded();
+  await expect(
+    page.locator('shreddit-comment[thingid="item-500"] [data-slopzap-ui]'),
+  ).toHaveCount(1);
+});
