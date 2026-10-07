@@ -3,7 +3,7 @@
   "date": "2026-10-07",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 52, "chromium": 29 },
+  "automatedTests": { "unit": 52, "chromium": 31 },
   "packagedFileReproducibility": {
     "passed": true,
     "files": 22,
@@ -23,7 +23,9 @@
     "units": 1000,
     "durationSeconds": 1800.54,
     "heapSamples": 30,
-    "finalHeapToTenMinuteRatio": 0.9943410595664516,
+    "lastRecordedHeapToTenMinuteRatio": 0.9943410595664516,
+    "heapBaselineSeconds": 600,
+    "lastHeapSampleSeconds": 1740,
     "cleanupBindings": 0,
     "candidateLimit": 1000,
     "allRegressionChecksPassed": true,
@@ -37,5 +39,11 @@
     "medium": "HTTP 403; not validated"
   },
   "onDeviceHardwareAcceptance": false,
+  "installedChromeProbe": {
+    "version": "155.0.8059.40",
+    "extensionLoadedByAutomatedProbe": false,
+    "modelCapabilityVerified": false,
+    "downloadStarted": false
+  },
   "independentCorpusAcceptance": false
 }

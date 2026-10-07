@@ -116,6 +116,14 @@ test('provider disagreement never authorizes automatic hiding', () => {
   });
   expect(result.automaticHide).toBe(false);
   expect(result.evidence).toBeLessThan(0.6);
+  const uncertain = compose(local, {
+    id: 'one',
+    score: local.score,
+    evidence: 0.1,
+    reasons: [],
+  });
+  expect(uncertain.status).toBe('insufficient_evidence');
+  expect(uncertain.automaticHide).toBe(false);
 });
 test('user-triggered model preparation monitors progress and releases its session', async () => {
   const destroy = vi.fn(),

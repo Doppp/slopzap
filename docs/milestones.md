@@ -22,7 +22,9 @@ SlopZap has a tested development alpha with onboarding, five fixture-tested adap
 
 ## Current external checks
 
-The local development verification completed 52 unit tests and 29 Chromium tests, a twelve-scenario enabled/disabled-processing benchmark matrix, and reproducible packaged-file hashes. A 1,000-unit virtualization diagnostic ran for 1,800.54 seconds; final post-GC heap was 99.4% of its first sample at or after ten minutes, with zero remaining runtime bindings after cleanup. This was a development build captured at run start, not a final-head paired reference-machine acceptance. Aggregate results are recorded in `docs/verification-results.json`.
+The local development verification completed 52 unit tests and 31 Chromium tests, a twelve-scenario enabled/disabled-processing benchmark matrix, and reproducible packaged-file hashes. A 1,000-unit virtualization diagnostic ran for 1,800.54 seconds; the last recorded post-GC heap sample at 1,740 seconds was 99.4% of the ten-minute sample, with zero remaining runtime bindings after cleanup. This was a development build captured at run start, not a final-head paired reference-machine acceptance. Aggregate results are recorded in `docs/verification-results.json`.
+
+A disposable-profile probe of installed Chrome 155 did not load the unpacked extension through automated command-line flags. No model download was started, and this result does not establish model capability on the machine. Real-model verification requires a normal permitted developer installation and the independent quality corpus.
 
 On 7 October 2026, public signed-out checks returned zero candidate units on Reddit/YouTube, an authentication route on LinkedIn, unavailable navigation on X and HTTP 403 on Medium. These do not validate normal rendered feeds. No authentication or access challenge was bypassed and no live content was copied into fixtures or reports.
 

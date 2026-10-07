@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { browser } from 'wxt/browser';
 import {
   DEFAULT_SETTINGS,
+  parseSettings,
   type Settings,
   type Snapshot,
   type Platform,
@@ -45,7 +46,8 @@ export function App({ options = false }: { options?: boolean }) {
     void browser.runtime
       .sendMessage({ type: 'SETTINGS_GET' })
       .then((value) => {
-        setSettings(value);
+        if (!value || value.error) throw new Error('Settings unavailable');
+        setSettings(parseSettings(value));
         setLoaded(true);
       })
       .catch(() =>
@@ -78,15 +80,22 @@ export function App({ options = false }: { options?: boolean }) {
         type: 'SETTINGS_SET',
         settings: { ...settings, ...patch },
       });
-      setSettings(next);
+      if (!next || next.error) throw new Error('Settings unavailable');
+      setSettings(parseSettings(next));
       setMessage('');
+      return true;
     } catch {
       setMessage('Could not save your settings.');
+      return false;
     }
   };
   const clear = async (store: 'results' | 'overrides') => {
     try {
-      await browser.runtime.sendMessage({ type: 'CACHE_CLEAR', store });
+      const result = await browser.runtime.sendMessage({
+        type: 'CACHE_CLEAR',
+        store,
+      });
+      if (!result?.ok) throw new Error('Storage unavailable');
       setMessage(
         store === 'results'
           ? 'Cache cleared. Existing page scores remain until navigation.'
@@ -126,7 +135,12 @@ export function App({ options = false }: { options?: boolean }) {
     try {
       await downloadModel(controller.signal, setProgress);
       if (controller.signal.aborted) return;
-      await update({ onDevice: true });
+      if (!(await update({ onDevice: true }))) {
+        setMessage(
+          'Model prepared, but preferences could not be saved. Local analysis continues.',
+        );
+        return;
+      }
       setMessage(
         'Chrome on-device analysis enabled where the API is available.',
       );
@@ -368,6 +382,7 @@ export function App({ options = false }: { options?: boolean }) {
               Blocker · {Math.round(settings.blockerThreshold * 100)}
               <input
                 type="range"
+                disabled={!loaded}
                 min="75"
                 max="95"
                 step="5"
@@ -383,6 +398,7 @@ export function App({ options = false }: { options?: boolean }) {
               Slop Only · {Math.round(settings.onlyThreshold * 100)}
               <input
                 type="range"
+                disabled={!loaded}
                 min="50"
                 max="90"
                 step="5"

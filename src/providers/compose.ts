@@ -7,7 +7,7 @@ export function compose(local: Result, model: ProviderResult): Result {
   return {
     ...local,
     status:
-      difference > 0.4
+      difference > 0.4 || model.evidence < 0.6
         ? 'insufficient_evidence'
         : model.evidence >= 0.6
           ? 'classified'

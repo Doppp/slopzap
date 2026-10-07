@@ -70,11 +70,15 @@ export class Runtime {
   private providerAbort = new AbortController();
   async start(): Promise<void> {
     try {
-      this.settings = parseSettings(
-        await browser.runtime.sendMessage({ type: 'SETTINGS_GET' }),
+      const value = await abortable(
+        browser.runtime.sendMessage({ type: 'SETTINGS_GET' }),
+        AbortSignal.timeout(3000),
       );
+      if (!value || value.error) throw new Error('Settings unavailable');
+      this.settings = parseSettings(value);
     } catch {
-      /* local defaults */
+      // Unknown preferences cannot authorize analysis or bypass a saved site/pause choice.
+      this.settings = { ...DEFAULT_SETTINGS, enabled: false };
     }
     browser.runtime.onMessage.addListener(this.onMessage);
     window.addEventListener('popstate', this.checkRoute);

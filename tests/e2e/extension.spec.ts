@@ -418,6 +418,36 @@ test('local diagnostic export contains only whitelisted counts, preferences and 
   });
 });
 
+test('storage failure leaves settings inert and does not report false clearing success', async () => {
+  const options = await context.newPage();
+  await options.addInitScript(() => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          runtime: { sendMessage(input: { type: string }): Promise<unknown> };
+        };
+      }
+    ).chrome;
+    const send = api.runtime.sendMessage.bind(api.runtime);
+    api.runtime.sendMessage = (input) =>
+      ['SETTINGS_GET', 'SETTINGS_SET', 'CACHE_CLEAR'].includes(input.type)
+        ? Promise.resolve({ error: 'storage_unavailable' })
+        : send(input);
+  });
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  await expect(options.getByRole('status')).toContainText(
+    'Settings are unavailable',
+  );
+  await expect(
+    options.getByRole('button', { name: 'Normal', exact: true }),
+  ).toBeDisabled();
+  await expect(options.getByRole('slider').first()).toBeDisabled();
+  await options.getByRole('button', { name: 'Clear score cache' }).click();
+  await expect(options.getByRole('status')).toContainText(
+    'Could not clear storage',
+  );
+});
+
 test('model preparation shows progress and can be cancelled without enabling a provider', async () => {
   const options = await context.newPage();
   await options.addInitScript(() => {
@@ -552,6 +582,34 @@ test('host scripts cannot spoof local feedback clicks', async () => {
   await expect(reply.locator('[slot="comment"]')).toBeVisible();
 });
 
+test('filtering never hides an inline editor inside an authored body', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply.locator('[slot="comment"]').evaluate((body) => {
+    const form = document.createElement('form');
+    const editor = document.createElement('textarea');
+    editor.setAttribute('aria-label', 'Invented inline draft');
+    editor.value = 'A private invented draft must remain visible and editable.';
+    form.append(editor);
+    body.append(form);
+  });
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  await expect(
+    reply.getByRole('textbox', { name: 'Invented inline draft' }),
+  ).toBeVisible();
+  await expect(reply.locator('[slot="comment"]')).toBeVisible();
+  await reply
+    .getByRole('button', { name: 'SlopZap: Not slop', exact: true })
+    .click();
+  await mode('Slop Only');
+  await expect(
+    reply.getByRole('textbox', { name: 'Invented inline draft' }),
+  ).toBeVisible();
+});
+
 test('unreliable parsing restores the page, stays paused and supports explicit retry', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const reply = page.locator('shreddit-comment[thingid="reply-1"]');
@@ -669,6 +727,23 @@ test('ambiguous authored bodies are rejected and stale scores are removed', asyn
     page.locator('shreddit-comment[thingid="reply-1"] [slot="comment"]'),
   ).toHaveCount(2);
   expect((await snapshot()).health.code).toBeNull();
+  const parent = page.locator('shreddit-comment[thingid="comment-1"]');
+  await parent.locator(':scope > [slot="comment"]').evaluate((body) => {
+    const child = document.createElement('shreddit-comment');
+    child.setAttribute('thingid', 'nested-authored-boundary');
+    const text = document.createElement('div');
+    text.slot = 'comment';
+    text.textContent =
+      'I tested this invented nested reply yesterday because the cache was warm.';
+    child.append(text);
+    body.append(child);
+  });
+  await expect(parent.locator(':scope > [data-slopzap-ui]')).toHaveCount(0);
+  await expect(
+    parent.locator(
+      'shreddit-comment[thingid="nested-authored-boundary"] [slot="comment"]',
+    ),
+  ).toBeVisible();
 });
 
 test('parser exceptions pause immediately without exporting page or error text; navigation recovers', async () => {

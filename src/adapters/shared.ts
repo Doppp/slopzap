@@ -82,7 +82,11 @@ export function createAdapter(config: Config): Adapter {
       );
       // A fallback is a selector variant, not permission to guess between authors.
       if (bodies.length > 1) return null;
-      if (bodies.length === 1) return bodies[0]!;
+      if (bodies.length === 1) {
+        const body = bodies[0]!;
+        // A wrapper containing another unit cannot safely identify one author's body.
+        return body.querySelector(config.candidates) ? null : body;
+      }
     }
     return null;
   };

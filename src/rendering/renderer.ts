@@ -29,7 +29,7 @@ export class Renderer {
     // Hiding a body containing descendants would orphan the branch. Annotate instead.
     if (
       this.binding.body.querySelector(
-        'shreddit-comment,ytd-comment-renderer,article,[data-sz-unit]',
+        'shreddit-comment,ytd-comment-renderer,article,[data-sz-unit],input,textarea,form,[role="textbox"],[contenteditable]:not([contenteditable="false"]),[data-sz-private]',
       )
     )
       presentation = 'visible';
@@ -55,7 +55,7 @@ export class Renderer {
       ? presentation === 'context'
         ? '⚡ Parent context'
         : `⚡ SlopZap hid this · ${value} Slop Score`
-      : result.status === 'classified'
+      : result.status === 'classified' && result.evidence >= 0.6
         ? `⚡ ${value}% Slop Score${verdict ? ' · locally corrected' : ' · provisional'}`
         : '⚡ Not enough evidence';
     label.title = `${result.reasons.join(' · ')}. Slop Score estimates low-information synthetic signals; it does not prove AI authorship.`;
