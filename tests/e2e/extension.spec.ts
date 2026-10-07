@@ -26,6 +26,16 @@ test.beforeEach(async () => {
     context.serviceWorkers()[0] ??
     (await context.waitForEvent('serviceworker'));
   extensionId = new URL(worker.url()).host;
+  await expect
+    .poll(() =>
+      context
+        .pages()
+        .some(
+          (tab) =>
+            tab.url() === `chrome-extension://${extensionId}/onboarding.html`,
+        ),
+    )
+    .toBe(true);
   const html = await readFile('fixtures/reddit/thread.html', 'utf8');
   await context.route('https://www.reddit.com/**', (route) =>
     route.fulfill({ contentType: 'text/html', body: html }),
@@ -287,4 +297,259 @@ test('host scripts cannot spoof local feedback clicks', async () => {
     .evaluate((button) => (button as HTMLElement).click());
   await mode('Slop Blocker');
   await expect(reply.locator('[slot="comment"]')).toBeVisible();
+});
+
+test('fresh install opens one accessible setup and saves the chosen view and sites', async () => {
+  const onboarding = context
+    .pages()
+    .find(
+      (tab) =>
+        tab.url() === `chrome-extension://${extensionId}/onboarding.html`,
+    )!;
+  await onboarding.bringToFront();
+  await expect(onboarding.getByRole('heading', { level: 2 })).toHaveText(
+    'A little less slop. A lot more signal.',
+  );
+  expect(
+    context.pages().filter((tab) => tab.url().endsWith('/onboarding.html')),
+  ).toHaveLength(1);
+  for (const step of [0, 1, 2]) {
+    expect(
+      (await new AxeBuilder({ page: onboarding }).analyze()).violations,
+    ).toEqual([]);
+    await onboarding.screenshot({
+      path: `test-results/onboarding-step-${step + 1}.png`,
+      fullPage: true,
+    });
+    if (step === 0)
+      await onboarding.getByRole('button', { name: 'Let’s set it up' }).click();
+    if (step === 1) {
+      await expect(
+        onboarding.getByRole('radio', { name: /Slop Goggles/ }),
+      ).toBeChecked();
+      await onboarding.getByRole('radio', { name: /Slop Only/ }).check();
+      await onboarding.getByRole('button', { name: 'Choose sites' }).click();
+    }
+  }
+  await onboarding
+    .getByRole('checkbox', { name: 'X / Twitter', exact: true })
+    .uncheck();
+  await onboarding
+    .getByRole('checkbox', { name: 'LinkedIn', exact: true })
+    .uncheck();
+  await onboarding.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(
+    onboarding.getByRole('radio', { name: /Slop Only/ }),
+  ).toBeChecked();
+  await onboarding.getByRole('button', { name: 'Choose sites' }).click();
+  await expect(
+    onboarding.getByRole('checkbox', { name: 'X / Twitter', exact: true }),
+  ).not.toBeChecked();
+  await onboarding.getByRole('button', { name: 'Save setup' }).click();
+  await expect(onboarding.getByRole('heading', { level: 2 })).toHaveText(
+    'You’re ready to zap.',
+  );
+  expect(
+    (await new AxeBuilder({ page: onboarding }).analyze()).violations,
+  ).toEqual([]);
+  await onboarding.screenshot({
+    path: 'test-results/onboarding-complete.png',
+    fullPage: true,
+  });
+  await onboarding.getByRole('button', { name: 'Try the demo feed' }).click();
+  await expect(onboarding).toHaveURL(
+    `chrome-extension://${extensionId}/harness.html`,
+  );
+  const preferences = await context.serviceWorkers()[0]!.evaluate(async () => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          storage: {
+            local: { get(keys: string[]): Promise<Record<string, unknown>> };
+          };
+        };
+      }
+    ).chrome;
+    return api.storage.local.get(['settings', 'onboarding']);
+  });
+  expect(preferences.onboarding).toMatchObject({
+    completed: true,
+    presented: true,
+  });
+  expect(preferences.settings).toMatchObject({
+    mode: 'only',
+    onDevice: false,
+    sites: { x: false, linkedin: false, youtube: true },
+  });
+  await onboarding.goto(`chrome-extension://${extensionId}/popup.html`);
+  await expect(
+    onboarding.getByRole('button', { name: 'Slop Only', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    onboarding.getByRole('button', { name: 'Open quick setup', exact: true }),
+  ).toHaveCount(0);
+});
+
+test('closing unfinished setup leaves a popup reminder; default completion preserves preferences', async () => {
+  const onboarding = context
+    .pages()
+    .find((tab) => tab.url().endsWith('/onboarding.html'))!;
+  await onboarding.close();
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  await popup
+    .getByRole('button', { name: 'Open quick setup', exact: true })
+    .click();
+  await expect
+    .poll(
+      () =>
+        context.pages().filter((tab) => tab.url().endsWith('/onboarding.html'))
+          .length,
+    )
+    .toBe(1);
+  const reopened = context
+    .pages()
+    .find((tab) => tab.url().endsWith('/onboarding.html'))!;
+  await reopened.getByRole('button', { name: 'Use current defaults' }).click();
+  await expect(reopened.getByRole('heading', { level: 2 })).toHaveText(
+    'You’re ready to zap.',
+  );
+  await popup.reload();
+  await expect(
+    popup.getByRole('button', { name: 'Slop Goggles', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    popup.getByRole('button', { name: 'Open quick setup', exact: true }),
+  ).toHaveCount(0);
+  await reopened.reload();
+  await expect(reopened.getByRole('heading', { level: 2 })).toHaveText(
+    'Review your quick setup',
+  );
+});
+
+test('completion survives browser restart without reopening setup or resetting preferences', async () => {
+  const onboarding = context
+    .pages()
+    .find((tab) => tab.url().endsWith('/onboarding.html'))!;
+  await onboarding
+    .getByRole('button', { name: 'Use current defaults' })
+    .click();
+  await expect(onboarding.getByRole('heading', { level: 2 })).toHaveText(
+    'You’re ready to zap.',
+  );
+  const apiResult = await context.serviceWorkers()[0]!.evaluate(async () => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          storage: {
+            local: {
+              get(key: string): Promise<{ settings: unknown }>;
+              set(value: unknown): Promise<void>;
+            };
+          };
+        };
+      }
+    ).chrome;
+    const settings = (await api.storage.local.get('settings')).settings as {
+      mode: string;
+      sites: Record<string, boolean>;
+      enabled: boolean;
+      onDevice: boolean;
+      blockerThreshold: number;
+    };
+    const customized = {
+      ...settings,
+      mode: 'normal',
+      enabled: false,
+      onDevice: true,
+      blockerThreshold: 0.95,
+      sites: { ...settings.sites, x: false },
+    };
+    await api.storage.local.set({ settings: customized });
+    return customized;
+  });
+  await onboarding.close();
+  await context.close();
+  const extension = resolve('.output/chrome-mv3');
+  context = await chromium.launchPersistentContext(profile, {
+    channel: 'chromium',
+    headless: true,
+    args: [
+      `--disable-extensions-except=${extension}`,
+      `--load-extension=${extension}`,
+    ],
+  });
+  const worker =
+    context.serviceWorkers()[0] ??
+    (await context.waitForEvent('serviceworker'));
+  const state = await worker.evaluate(async () => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          storage: {
+            local: { get(keys: string[]): Promise<Record<string, unknown>> };
+          };
+        };
+      }
+    ).chrome;
+    return api.storage.local.get(['settings', 'onboarding']);
+  });
+  expect(state.settings).toEqual(apiResult);
+  expect(state.onboarding).toMatchObject({ completed: true });
+  expect(
+    context.pages().filter((tab) => tab.url().endsWith('/onboarding.html')),
+  ).toHaveLength(0);
+  const review = await context.newPage();
+  await review.goto(`chrome-extension://${extensionId}/onboarding.html`);
+  await expect(review.getByRole('heading', { level: 2 })).toHaveText(
+    'Review your quick setup',
+  );
+  await review.getByRole('button', { name: 'Use current defaults' }).click();
+  await expect(review.getByRole('heading', { level: 2 })).toHaveText(
+    'You’re ready to zap.',
+  );
+  await expect(review.getByText(/currently paused/)).toBeVisible();
+});
+
+test('setup supports keyboard navigation and opting out of every site at small widths', async () => {
+  const onboarding = context
+    .pages()
+    .find((tab) => tab.url().endsWith('/onboarding.html'))!;
+  await onboarding.setViewportSize({ width: 390, height: 844 });
+  await onboarding.bringToFront();
+  await onboarding.getByRole('button', { name: 'Let’s set it up' }).focus();
+  await onboarding.keyboard.press('Enter');
+  await expect(onboarding.getByRole('heading', { level: 2 })).toHaveText(
+    'How do you want to browse?',
+  );
+  await onboarding.getByRole('radio', { name: /Slop Goggles/ }).focus();
+  await expect(
+    onboarding.getByRole('radio', { name: /Slop Goggles/ }),
+  ).toBeFocused();
+  await onboarding.keyboard.press('ArrowDown');
+  await expect(
+    onboarding.getByRole('radio', { name: /Slop Blocker/ }),
+  ).toBeChecked();
+  await onboarding.getByRole('button', { name: 'Choose sites' }).click();
+  for (const checkbox of await onboarding.getByRole('checkbox').all())
+    await checkbox.uncheck();
+  await expect(onboarding.getByText(/All sites are off/)).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page: onboarding }).analyze()).violations,
+  ).toEqual([]);
+  expect(
+    await onboarding.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await onboarding.screenshot({
+    path: 'test-results/onboarding-mobile.png',
+    fullPage: true,
+  });
+  await onboarding.getByRole('button', { name: 'Save setup' }).click();
+  await expect(onboarding.getByText('0 of 5', { exact: true })).toBeVisible();
+  await onboarding
+    .getByRole('button', { name: 'Start browsing', exact: true })
+    .click();
+  await expect.poll(() => onboarding.isClosed()).toBe(true);
 });
