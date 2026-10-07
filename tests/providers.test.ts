@@ -51,39 +51,42 @@ test('schema validation rejects arbitrary IDs, prose, extra fields and out-of-ra
     validateOutput({ results: [result], prose: 'untrusted' }, inputs),
   ).toThrow();
 });
-test('comparison baseline removes references without changing common classification policy', async () => {
-  const prompt = vi.fn(async (input: string) => {
-    const value = JSON.parse(input);
-    expect(value).not.toHaveProperty('referenceGuide');
-    expect(value.items).toEqual(inputs);
-    return JSON.stringify({
-      results: [{ id: 'one', score: 0.5, evidence: 0.8, reasons: [] }],
+test.each([undefined, false])(
+  'ordinary provider and explicit baseline omit experimental references (%s)',
+  async (references) => {
+    const prompt = vi.fn(async (input: string) => {
+      const value = JSON.parse(input);
+      expect(value).not.toHaveProperty('referenceGuide');
+      expect(value.items).toEqual(inputs);
+      return JSON.stringify({
+        results: [{ id: 'one', score: 0.5, evidence: 0.8, reasons: [] }],
+      });
     });
-  });
-  const clone = { clone: vi.fn(), prompt, destroy: vi.fn() };
-  const create = vi.fn(async () => ({
-    clone: vi.fn(async () => clone),
-    prompt: vi.fn(),
-    destroy: vi.fn(),
-  }));
-  const provider = new ChromePromptProvider(
-    { availability: vi.fn(async () => 'available'), create },
-    false,
-  );
-  try {
-    await provider.classify(inputs, new AbortController().signal);
-  } finally {
-    provider.close();
-  }
-  expect(create).toHaveBeenCalledWith(
-    expect.objectContaining({
-      initialPrompts: [{ role: 'system', content: BASELINE_INSTRUCTIONS }],
-    }),
-  );
-  expect(BASELINE_INSTRUCTIONS).not.toContain('referenceGuide');
-  expect(INSTRUCTIONS).toContain('referenceGuide');
-});
-test('each batch uses a fresh cloned session and destroys it', async () => {
+    const clone = { clone: vi.fn(), prompt, destroy: vi.fn() };
+    const create = vi.fn(async () => ({
+      clone: vi.fn(async () => clone),
+      prompt: vi.fn(),
+      destroy: vi.fn(),
+    }));
+    const provider = new ChromePromptProvider(
+      { availability: vi.fn(async () => 'available'), create },
+      references,
+    );
+    try {
+      await provider.classify(inputs, new AbortController().signal);
+    } finally {
+      provider.close();
+    }
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialPrompts: [{ role: 'system', content: BASELINE_INSTRUCTIONS }],
+      }),
+    );
+    expect(BASELINE_INSTRUCTIONS).not.toContain('referenceGuide');
+    expect(INSTRUCTIONS).toContain('referenceGuide');
+  },
+);
+test('explicit guided experiment retrieves bounded references and releases fresh clones', async () => {
   const destroy = vi.fn();
   const clone: ModelSession = {
     clone: vi.fn(),
@@ -103,7 +106,7 @@ test('each batch uses a fresh cloned session and destroys it', async () => {
     availability: vi.fn().mockResolvedValue('available'),
     create: vi.fn().mockResolvedValue(base),
   };
-  const provider = new ChromePromptProvider(api);
+  const provider = new ChromePromptProvider(api, true);
   await provider.classify(inputs, new AbortController().signal);
   await provider.classify(inputs, new AbortController().signal);
   const prompt = JSON.parse(vi.mocked(clone.prompt).mock.calls[0]![0]);
@@ -191,6 +194,9 @@ test('user-triggered model preparation monitors progress and releases its sessio
   expect(progress).toHaveBeenCalledWith(0.5);
   expect(destroy).toHaveBeenCalledTimes(1);
   expect(api.create).toHaveBeenCalledWith(
-    expect.objectContaining({ signal: controller.signal }),
+    expect.objectContaining({
+      signal: controller.signal,
+      initialPrompts: [{ role: 'system', content: BASELINE_INSTRUCTIONS }],
+    }),
   );
 });
