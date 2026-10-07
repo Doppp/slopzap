@@ -1,4 +1,5 @@
 import type { Unit } from '../shared/types';
+import { authoredProse, phraseSignals } from './reference-patterns';
 const words = (text: string) =>
   text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 const stop = new Set(
@@ -6,32 +7,31 @@ const stop = new Set(
     ' ',
   ),
 );
-export function features(unit: Unit) {
+export function features(unit: Pick<Unit, 'text' | 'parentText' | 'rootText'>) {
   const tokens = words(unit.text);
-  const target = new Set(tokens.filter((token) => !stop.has(token)));
+  const prose = authoredProse(unit.text);
+  const proseTokens = words(prose);
+  const target = new Set(proseTokens.filter((token) => !stop.has(token)));
   const parent = new Set(
-    words(unit.parentText || unit.rootText).filter((token) => !stop.has(token)),
+    words(authoredProse(unit.parentText || unit.rootText)).filter(
+      (token) => !stop.has(token),
+    ),
   );
   const common = [...target].filter((token) => parent.has(token)).length;
   const overlap =
     parent.size >= 4 && common >= 3
       ? common / Math.min(target.size, parent.size)
       : 0;
-  const genericCount =
-    unit.text.match(
-      /\b(great insight|absolutely|well said|couldn.t agree more|thank you for sharing|spot on|so true|game changer|valuable perspective)\b/gi,
-    )?.length ?? 0;
-  const formulaicCount =
-    unit.text.match(
-      /\b(in today.s|ever.evolving|not just.+?but|it.s not about.+?it.s about|in conclusion|delve into|foster|leverage|valuable perspective|insightful|important topic|unlocking.+?potential)\b/gi,
-    )?.length ?? 0;
+  const { generic: genericCount, formulaic: formulaicCount } = phraseSignals(
+    unit.text,
+  );
   const specific =
     /\d|https?:|`|\b(error|because|tested|measured|yesterday|tomorrow|my team|I tried|for example)\b/i.test(
-      unit.text,
+      prose,
     );
   const diversity =
     target.size /
-    Math.max(1, tokens.filter((token) => !stop.has(token)).length);
+    Math.max(1, proseTokens.filter((token) => !stop.has(token)).length);
   const latin =
     tokens.filter((token) => /^[a-z]+$/.test(token)).length /
     Math.max(1, tokens.length);
@@ -62,6 +62,10 @@ export function features(unit: Unit) {
     redundancy: overlap > 0.6 ? overlap : 0,
     lowDiversity: tokens.length >= 20 && diversity < 0.5 ? 1 - diversity : 0,
     specific,
+    quotedRatio:
+      1 -
+      prose.replace(/\s/g, '').length /
+        Math.max(1, unit.text.replace(/\s/g, '').length),
     supported:
       latin >= 0.8 &&
       (englishAnchors >= 2 || genericCount >= 2 || formulaicCount >= 2),

@@ -52,7 +52,7 @@ export interface Snapshot {
   corrected: number;
 }
 export type Verdict = 'not_slop' | 'slop';
-export const CLASSIFIER_VERSION = 'provisional-features-v3';
+export const CLASSIFIER_VERSION = 'provisional-features-v4:reference-guide-v1';
 export function parseSettings(value: unknown): Settings {
   const input =
     value && typeof value === 'object' ? (value as Partial<Settings>) : {};

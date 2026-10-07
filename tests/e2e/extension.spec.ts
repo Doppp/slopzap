@@ -182,6 +182,47 @@ test('dynamic insertions, removals and SPA navigation do not retain stale UI', a
   expect(afterPrivate).toBe(beforePrivate);
 });
 
+test('reference cues alone and quoted clichés never authorize hiding', async () => {
+  await page.evaluate(() => {
+    const examples = [
+      [
+        'invented-praise',
+        'Absolutely, great insight! Thank you for sharing this valuable perspective on the work that all of our colleagues do together.',
+      ],
+      [
+        'invented-quote',
+        'The phrase “great insight and thank you for sharing this valuable perspective” does not explain the actual failure in the system. We need the trace to investigate the error.',
+      ],
+      [
+        'invented-technical',
+        'We leverage the tree index to foster consistent reads and delve into the trace because the version check runs before invalidation.',
+      ],
+    ];
+    for (const [id, text] of examples) {
+      const comment = document.createElement('shreddit-comment');
+      comment.setAttribute('thingid', id!);
+      const body = document.createElement('div');
+      body.slot = 'comment';
+      body.textContent = text!;
+      comment.append(body);
+      document.querySelector('main')!.append(comment);
+    }
+  });
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(6);
+  await expect(
+    page.locator(
+      'shreddit-comment[thingid="invented-praise"] [data-slopzap-ui]',
+    ),
+  ).toContainText('49% Slop Score');
+  const before = (await snapshot()).stats.classifications;
+  await mode('Slop Blocker');
+  for (const id of ['invented-praise', 'invented-quote', 'invented-technical'])
+    await expect(
+      page.locator(`shreddit-comment[thingid="${id}"] [slot="comment"]`),
+    ).toBeVisible();
+  expect((await snapshot()).stats.classifications).toBe(before);
+});
+
 for (const scenario of [
   {
     platform: 'youtube',

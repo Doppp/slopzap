@@ -4,6 +4,8 @@
 
 The shipped scorer is an untrained, transparent heuristic. All its results have `automaticHide: false`. Chrome Prompt results also retain this restriction. Manual exact-item corrections exercise Blocker safely.
 
+The packaged reference guide is invented classifier/prompt guidance, not additional validation data. Keep new test examples separate from guidance and do not count retrieved references as held-out evaluation. Experimental model exports declare the exact feature version and incompatible prior exports are rejected. See `docs/reference-guidance.md`.
+
 Before enabling automatic hiding, collect the independently reviewed ≥2,000-item corpus in SPEC.md, group paraphrases/templates by source before splitting, reserve a held-out test set, report protected-slice confidence intervals and abstention, and record the exact scorer/provider version. Do not use this seed as training data and then report its training performance as validation.
 
 Do not upload browsing feedback. Corpus contributions need deliberate author/licensing consent and removal of identifying data. Real platform comments are not implicitly licensed training material.

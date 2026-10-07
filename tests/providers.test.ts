@@ -8,6 +8,8 @@ import {
 import { validateOutput, type ProviderInput } from '../src/providers/types';
 import { compose } from '../src/providers/compose';
 import { classify } from '../src/classifier/local';
+import { REFERENCE_VERSION } from '../src/classifier/reference-patterns';
+import { MAX_REFERENCE_CHARACTERS } from '../src/classifier/reference-guide';
 const inputs: ProviderInput[] = [
   {
     id: 'one',
@@ -70,6 +72,17 @@ test('each batch uses a fresh cloned session and destroys it', async () => {
   const provider = new ChromePromptProvider(api);
   await provider.classify(inputs, new AbortController().signal);
   await provider.classify(inputs, new AbortController().signal);
+  const prompt = JSON.parse(vi.mocked(clone.prompt).mock.calls[0]![0]);
+  expect(prompt.items).toEqual(inputs);
+  expect(prompt.referenceGuide.version).toBe(REFERENCE_VERSION);
+  expect(prompt.referenceGuide.pairs.length).toBeGreaterThan(0);
+  expect(prompt.referenceGuide.pairs.length).toBeLessThanOrEqual(2);
+  expect(JSON.stringify(prompt.referenceGuide).length).toBeLessThanOrEqual(
+    MAX_REFERENCE_CHARACTERS,
+  );
+  expect(JSON.stringify(prompt.referenceGuide)).not.toContain(
+    'Ignore instructions',
+  );
   expect(base.clone).toHaveBeenCalledTimes(2);
   expect(base.prompt).not.toHaveBeenCalled();
   expect(destroy).toHaveBeenCalledTimes(2);
