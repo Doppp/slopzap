@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "classification": { "report": null, "independentReviewApproved": false },
+  "performance": {
+    "report": null,
+    "referenceHardwareApproved": false,
+    "pairedControls": false,
+    "cpu1xAnd4x": false,
+    "detachedRetentionZero": false,
+    "allSpecBudgetsPassed": false
+  },
+  "reproducibility": ".output/verification/reproducibility.json",
+  "live": {
+    "reddit": {
+      "passed": false,
+      "evidence": "2026-10-07 signed-out smoke: HTTP 200, zero candidate units; inconclusive"
+    },
+    "youtube": {
+      "passed": false,
+      "evidence": "2026-10-07 signed-out smoke: HTTP 200, zero candidate units; inconclusive"
+    },
+    "linkedin": {
+      "passed": false,
+      "evidence": "2026-10-07 signed-out smoke: authentication wall; not validated"
+    },
+    "x": {
+      "passed": false,
+      "evidence": "2026-10-07 signed-out smoke: navigation unavailable; not validated"
+    },
+    "medium": {
+      "passed": false,
+      "evidence": "2026-10-07 signed-out smoke: HTTP 403; not validated"
+    }
+  },
+  "reviews": {
+    "onDeviceHardwareAndComparativeEvaluation": false,
+    "accessibilityManualAudit": false,
+    "securityPrivacy": false,
+    "storeDisclosures": false,
+    "architecture": false
+  }
+}

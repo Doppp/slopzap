@@ -9,6 +9,7 @@ export type Kind =
   | 'article'
   | 'article_response';
 export interface Settings {
+  debug: boolean;
   onDevice: boolean;
   enabled: boolean;
   mode: Mode;
@@ -17,6 +18,7 @@ export interface Settings {
   sites: Record<Exclude<Platform, 'synthetic'>, boolean>;
 }
 export const DEFAULT_SETTINGS: Settings = {
+  debug: false,
   onDevice: false,
   enabled: true,
   mode: 'goggles',
@@ -59,6 +61,7 @@ export function parseSettings(value: unknown): Settings {
       ? Math.min(0.95, Math.max(minimum, n))
       : fallback;
   return {
+    debug: input.debug === true,
     onDevice: input.onDevice === true,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : true,
     mode: ['normal', 'blocker', 'only', 'goggles'].includes(input.mode ?? '')

@@ -15,7 +15,9 @@ export interface ScoredItem {
 }
 export function score(item: ScoredItem): number | undefined {
   if (item.verdict) return item.verdict === 'slop' ? 1 : 0;
-  return item.result?.status === 'classified' ? item.result.score : undefined;
+  return item.result?.status === 'classified' && item.result.evidence >= 0.6
+    ? item.result.score
+    : undefined;
 }
 export function presentations(
   items: ScoredItem[],
@@ -72,7 +74,8 @@ export function aggregate(items: ScoredItem[], pending: number): Snapshot {
       corrected++;
       continue;
     }
-    if (item.result?.status !== 'classified') continue;
+    if (item.result?.status !== 'classified' || item.result.evidence < 0.6)
+      continue;
     analysed++;
     const w = Math.max(0.5, item.result.evidence);
     total += item.result.score * w;

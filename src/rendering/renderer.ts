@@ -19,6 +19,8 @@ export class Renderer {
     result: Result | undefined,
     verdict: Verdict | undefined,
   ): void {
+    const focused =
+      this.ui?.shadowRoot?.activeElement?.getAttribute('aria-label');
     this.removeUi();
     if (this.hidden) this.binding.body.hidden = this.originalHidden;
     else this.originalHidden = this.binding.body.hidden;
@@ -27,7 +29,7 @@ export class Renderer {
     // Hiding a body containing descendants would orphan the branch. Annotate instead.
     if (
       this.binding.body.querySelector(
-        'shreddit-comment,ytd-comment-renderer,article,[data-sz-unit]',
+        'shreddit-comment,ytd-comment-renderer,article,[data-sz-unit],input,textarea,form,[role="textbox"],[contenteditable]:not([contenteditable="false"]),[data-sz-private]',
       )
     )
       presentation = 'visible';
@@ -53,7 +55,7 @@ export class Renderer {
       ? presentation === 'context'
         ? '⚡ Parent context'
         : `⚡ SlopZap hid this · ${value} Slop Score`
-      : result.status === 'classified'
+      : result.status === 'classified' && result.evidence >= 0.6
         ? `⚡ ${value}% Slop Score${verdict ? ' · locally corrected' : ' · provisional'}`
         : '⚡ Not enough evidence';
     label.title = `${result.reasons.join(' · ')}. Slop Score estimates low-information synthetic signals; it does not prove AI authorship.`;
@@ -73,6 +75,25 @@ export class Renderer {
     if (collapse) this.binding.body.before(host);
     else this.binding.body.after(host);
     this.ui = host;
+    if (focused) {
+      const alternate =
+        focused === 'SlopZap: Show'
+          ? 'SlopZap: Hide'
+          : focused === 'SlopZap: Hide'
+            ? 'SlopZap: Show'
+            : focused;
+      const buttons = Array.from(
+        shadow.querySelectorAll<HTMLButtonElement>('button'),
+      );
+      (
+        buttons.find(
+          (button) => button.getAttribute('aria-label') === focused,
+        ) ??
+        buttons.find(
+          (button) => button.getAttribute('aria-label') === alternate,
+        )
+      )?.focus({ preventScroll: true });
+    }
   }
   private button(label: string, click: () => void): HTMLButtonElement {
     const button = document.createElement('button');

@@ -1,32 +1,47 @@
 import { browser } from 'wxt/browser';
 import type { Result, Unit } from '../shared/types';
 import { validResult } from '../messaging/protocol';
+import { abortable } from '../shared/async';
 
 export class LocalClassifier {
-  private closed = false;
+  private lifetime = new AbortController();
+  constructor(
+    private send: (message: unknown) => Promise<unknown> = (message) =>
+      browser.runtime.sendMessage(message),
+  ) {}
   async classify(
     items: { unit: Unit; fingerprint: string }[],
   ): Promise<Result[]> {
-    if (this.closed) throw new Error('Classifier stopped');
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const results: unknown = await Promise.race([
-        browser.runtime.sendMessage({ type: 'CLASSIFY_LOCAL', items }),
-        new Promise((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error('Classifier timeout')),
-            3000,
-          );
-        }),
-      ]);
-      if (this.closed || !Array.isArray(results) || !results.every(validResult))
+    for (let attempt = 0; attempt < 2; attempt++) {
+      this.lifetime.signal.throwIfAborted();
+      let results: unknown;
+      try {
+        results = await abortable(
+          this.send({ type: 'CLASSIFY_LOCAL', items }),
+          AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(3000)]),
+        );
+      } catch {
+        if (attempt || this.lifetime.signal.aborted)
+          throw new Error('Local classifier unavailable');
+        else continue;
+      }
+      if (
+        this.lifetime.signal.aborted ||
+        !Array.isArray(results) ||
+        !results.every(validResult) ||
+        new Set(results.map((result) => result.fingerprint)).size !==
+          results.length ||
+        results.some(
+          (result) =>
+            !items.some((item) => item.fingerprint === result.fingerprint),
+        )
+      )
         throw new Error('Invalid classifier result');
       return results;
-    } finally {
-      if (timer !== undefined) clearTimeout(timer);
     }
+    throw new Error('Local classifier unavailable');
   }
   close(): void {
-    this.closed = true;
+    this.lifetime.abort();
   }
 }

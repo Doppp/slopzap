@@ -16,6 +16,8 @@ import { compose, PROVIDER_VERSION } from '../providers/compose';
 import { CLASSIFIER_VERSION } from '../shared/types';
 import { Renderer } from '../rendering/renderer';
 import { AdapterHealth, type AdapterFailure } from './adapter-health';
+import { Metrics } from './metrics';
+import { abortable } from '../shared/async';
 import {
   aggregate,
   presentations,
@@ -38,6 +40,7 @@ export class Runtime {
   private pausedRoute: string | undefined;
   private health = new AdapterHealth();
   private sampled = new WeakSet<HTMLElement>();
+  private metrics = new Metrics();
   private generation = 0;
   private worker: LocalClassifier | undefined;
   private mutation: MutationObserver | undefined;
@@ -67,11 +70,15 @@ export class Runtime {
   private providerAbort = new AbortController();
   async start(): Promise<void> {
     try {
-      this.settings = parseSettings(
-        await browser.runtime.sendMessage({ type: 'SETTINGS_GET' }),
+      const value = await abortable(
+        browser.runtime.sendMessage({ type: 'SETTINGS_GET' }),
+        AbortSignal.timeout(3000),
       );
+      if (!value || value.error) throw new Error('Settings unavailable');
+      this.settings = parseSettings(value);
     } catch {
-      /* local defaults */
+      // Unknown preferences cannot authorize analysis or bypass a saved site/pause choice.
+      this.settings = { ...DEFAULT_SETTINGS, enabled: false };
     }
     browser.runtime.onMessage.addListener(this.onMessage);
     window.addEventListener('popstate', this.checkRoute);
@@ -94,11 +101,13 @@ export class Runtime {
       this.pausedRoute = undefined;
       this.health = new AdapterHealth();
       this.sampled = new WeakSet();
+      this.metrics = new Metrics();
       this.checkRoute();
       sendResponse({ ok: true });
     } else if (message.type === 'SETTINGS_CHANGED') {
       const previous = this.settings;
       this.settings = parseSettings(message.settings);
+      if (previous.debug !== this.settings.debug) this.metrics = new Metrics();
       if (
         previous.enabled !== this.settings.enabled ||
         previous.onDevice !== this.settings.onDevice ||
@@ -115,6 +124,7 @@ export class Runtime {
         platform: this.adapter?.platform,
         settings: this.settings,
         aggregate: this.snapshot(),
+        timings: this.settings.debug ? this.metrics.snapshot() : {},
         health: this.health.snapshot(),
         stats: {
           bound: this.entries.size,
@@ -143,6 +153,7 @@ export class Runtime {
       this.pausedRoute = undefined;
       this.health = new AdapterHealth();
       this.sampled = new WeakSet();
+      this.metrics = new Metrics();
     }
     if (
       !this.settings.enabled ||
@@ -193,6 +204,7 @@ export class Runtime {
       { rootMargin: '100% 0px 150% 0px' },
     );
     this.mutation = new MutationObserver((records) => {
+      const started = this.settings.debug ? performance.now() : 0;
       for (const record of records) {
         const target =
           record.target.nodeType === Node.ELEMENT_NODE
@@ -234,6 +246,8 @@ export class Runtime {
       }
       if (this.dirty.length) this.scheduleDiscovery();
       this.scheduleBatch();
+      if (this.settings.debug)
+        this.metrics.record('mutation', performance.now() - started);
     });
     for (const root of roots) {
       this.mutation.observe(root, {
@@ -241,7 +255,17 @@ export class Runtime {
         subtree: true,
         characterData: true,
         attributes: true,
-        attributeFilter: ['thingid', 'data-urn', 'data-id', 'data-tweet-id'],
+        attributeFilter: [
+          'thingid',
+          'data-urn',
+          'data-id',
+          'data-tweet-id',
+          'data-comment-id',
+          'data-post-id',
+          'data-fullname',
+          'id',
+          'href',
+        ],
       });
       this.dirty.push(root);
     }
@@ -279,6 +303,8 @@ export class Runtime {
         else this.scan = undefined;
       }
       if (this.dirty.length || this.scan) this.scheduleDiscovery();
+      if (this.settings.debug)
+        this.metrics.record('discovery', performance.now() - start);
     }, 0);
   }
   private registerCandidate(node: HTMLElement): void {
@@ -340,6 +366,10 @@ export class Runtime {
   }
   private async process(): Promise<void> {
     if (!this.adapter || !this.worker) return;
+    if (!this.isCurrentRoute()) {
+      this.checkRoute();
+      return;
+    }
     this.busy = true;
     const generation = this.generation;
     const batch = Array.from(this.queue)
@@ -379,7 +409,7 @@ export class Runtime {
         if (parentEntry)
           binding.unit.parentText = parentEntry.binding.unit.text.slice(0, 800);
         const key = await fingerprint(binding.unit, this.route);
-        if (generation !== this.generation) return;
+        if (generation !== this.generation || !this.isCurrentRoute()) return;
         if (old?.fingerprint === key && old.result) {
           work.push(old);
           continue;
@@ -405,19 +435,25 @@ export class Runtime {
         overrides: {},
       };
       if (missing.length) {
+        const cacheStarted = this.settings.debug ? performance.now() : 0;
         try {
-          const value = await browser.runtime.sendMessage({
-            type: 'CACHE_GET',
-            version: this.settings.onDevice
-              ? PROVIDER_VERSION
-              : CLASSIFIER_VERSION,
-            keys: [...new Set(missing.map((entry) => entry.fingerprint))],
-          });
+          const value = await abortable(
+            browser.runtime.sendMessage({
+              type: 'CACHE_GET',
+              version: this.settings.onDevice
+                ? PROVIDER_VERSION
+                : CLASSIFIER_VERSION,
+              keys: [...new Set(missing.map((entry) => entry.fingerprint))],
+            }),
+            AbortSignal.timeout(3000),
+          );
           if (value?.results) cached = value;
         } catch {
           /* cache failure does not stop local processing */
         }
-        if (generation !== this.generation) return;
+        if (generation !== this.generation || !this.isCurrentRoute()) return;
+        if (this.settings.debug)
+          this.metrics.record('cache', performance.now() - cacheStarted);
         for (const entry of missing) {
           entry.result = cached.results.find(
             (result) => result.fingerprint === entry.fingerprint,
@@ -432,13 +468,19 @@ export class Runtime {
           ).values(),
         ];
         if (inputs.length) {
+          const classifyStarted = this.settings.debug ? performance.now() : 0;
           const results = await this.worker.classify(
             inputs.map((entry) => ({
               unit: entry.binding.unit,
               fingerprint: entry.fingerprint,
             })),
           );
-          if (generation !== this.generation) return;
+          if (generation !== this.generation || !this.isCurrentRoute()) return;
+          if (this.settings.debug)
+            this.metrics.record(
+              'classify',
+              performance.now() - classifyStarted,
+            );
           this.classifiedCount += results.length;
           for (const entry of missing)
             entry.result =
@@ -450,7 +492,7 @@ export class Runtime {
             .catch(() => {});
         }
       }
-      if (generation !== this.generation) return;
+      if (generation !== this.generation || !this.isCurrentRoute()) return;
       for (const entry of work)
         if (this.queue.has(entry.binding.container)) entry.renderer.cleanup();
         else if (
@@ -459,7 +501,7 @@ export class Runtime {
         )
           this.history.set(entry.fingerprint, this.scored(entry));
       // History holds numeric results, never DOM nodes or raw text.
-      if (this.history.size > 10_000)
+      while (this.history.size > 10_000)
         this.history.delete(this.history.keys().next().value!);
       this.render();
       if (this.provider) {
@@ -480,9 +522,8 @@ export class Runtime {
         }
     } catch {
       /* fail open; restore all presentation for this failed batch */
-      for (const node of batch) {
-        this.entries.get(node)?.renderer.cleanup();
-      }
+      if (generation === this.generation)
+        this.pauseAdapter('classifier_unavailable');
     } finally {
       if (generation === this.generation) {
         this.busy = false;
@@ -492,10 +533,24 @@ export class Runtime {
   }
   private async processProvider(): Promise<void> {
     if (!this.provider || this.providerBusy || !this.providerQueue.size) return;
+    if (!this.isCurrentRoute()) {
+      this.checkRoute();
+      return;
+    }
     this.providerBusy = true;
     const generation = this.generation;
     const provider = this.provider;
-    const batch = [...this.providerQueue].slice(0, 12);
+    const queued = [...this.providerQueue].sort(
+      (a, b) =>
+        Number(a.binding.unit.kind === 'article') -
+        Number(b.binding.unit.kind === 'article'),
+    );
+    const batch =
+      queued[0]?.binding.unit.kind === 'article'
+        ? queued.slice(0, 1)
+        : queued
+            .filter((entry) => entry.binding.unit.kind !== 'article')
+            .slice(0, 12);
     batch.forEach((entry) => this.providerQueue.delete(entry));
     const active = batch.filter(
       (entry) =>
@@ -508,7 +563,10 @@ export class Runtime {
         active.map((entry) => ({
           id: entry.key,
           unit: {
-            text: entry.binding.unit.text.slice(0, 6000),
+            text: entry.binding.unit.text.slice(
+              0,
+              entry.binding.unit.kind === 'article' ? 8000 : 6000,
+            ),
             parentText: entry.binding.unit.parentText,
             rootText: entry.binding.unit.rootText,
             quotedText: entry.binding.unit.quotedText,
@@ -518,7 +576,7 @@ export class Runtime {
         })),
         AbortSignal.any([this.providerAbort.signal, AbortSignal.timeout(8000)]),
       );
-      if (generation !== this.generation) return;
+      if (generation !== this.generation || !this.isCurrentRoute()) return;
       const saved: Result[] = [];
       for (const item of results) {
         const entry = active.find((entry) => entry.key === item.id);
@@ -574,6 +632,14 @@ export class Runtime {
       verdict: entry.verdict,
     };
   }
+  private isCurrentRoute(): boolean {
+    const url = new URL(location.href);
+    return (
+      !!this.adapter &&
+      this.adapter.matches(url) &&
+      this.adapter.routeKey(url) === this.route
+    );
+  }
   private render(): void {
     if (this.renderFrame) cancelAnimationFrame(this.renderFrame);
     const entries = Array.from(this.entries.values());
@@ -604,6 +670,8 @@ export class Runtime {
       }
       this.renderFrame =
         index < entries.length ? requestAnimationFrame(drain) : 0;
+      if (this.settings.debug)
+        this.metrics.record('render', performance.now() - start);
     };
     this.renderFrame = requestAnimationFrame(drain);
   }

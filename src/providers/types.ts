@@ -60,10 +60,25 @@ export function validateOutput(
     !value ||
     typeof value !== 'object' ||
     !('results' in value) ||
-    !Array.isArray(value.results)
+    !Array.isArray(value.results) ||
+    value.results.length > 12 ||
+    Object.keys(value).some((key) => key !== 'results')
   )
     throw new Error('Invalid provider response');
   const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const item of value.results) {
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      !('id' in item) ||
+      typeof item.id !== 'string'
+    )
+      continue;
+    if (seen.has(item.id)) duplicates.add(item.id);
+    seen.add(item.id);
+  }
+  seen.clear();
   const accepted: ProviderResult[] = [];
   for (const item of value.results as unknown[]) {
     if (!item || typeof item !== 'object') continue;
@@ -71,6 +86,7 @@ export function validateOutput(
     if (
       !inputs.some((input) => input.id === r.id) ||
       seen.has(r.id) ||
+      duplicates.has(r.id) ||
       Object.keys(r).some(
         (key) => !['id', 'score', 'evidence', 'reasons'].includes(key),
       )

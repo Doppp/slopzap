@@ -1,4 +1,5 @@
 import { CLASSIFIER_VERSION, type Result, type Verdict } from '../shared/types';
+import { validResult } from '../messaging/protocol';
 
 const MAX_RECORDS = 20_000;
 const TTL = 90 * 24 * 60 * 60 * 1000;
@@ -90,6 +91,7 @@ export async function lookup(
         key,
         result:
           result &&
+          validResult(result.result) &&
           result.expires > now &&
           (result.result?.version === version ||
             result.result?.version === CLASSIFIER_VERSION)
@@ -111,6 +113,7 @@ export async function lookup(
   };
 }
 export async function save(results: Result[]): Promise<void> {
+  if (!results.every(validResult)) throw new Error('Invalid cached result');
   const connection = await db();
   const transaction = connection.transaction('results', 'readwrite');
   const completion = completed(transaction);

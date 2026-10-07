@@ -1,0 +1,37 @@
+# Milestone status
+
+SlopZap has a tested development alpha with onboarding, five fixture-tested adapters, conservative scoring and local storage. Implementation and release acceptance are separate: a completed code path does not establish independent classifier accuracy, live compatibility or reference-machine performance. This status follows SPEC.md §35 and the implementation decisions in §42.
+
+| Milestone               | Implementation evidence                                                                                                           | Remaining acceptance                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1 Foundation            | MV3 shell, schemas, strict types, CI, permissions/CSP and package budget checks                                                   | Complete for the development alpha                                                             |
+| 2 Synthetic slice       | Packaged invented feed, route sessions, popup and setup/demo handoff                                                              | Complete                                                                                       |
+| 3 Dynamic runtime       | Viewport queue, edits/recycling, cancellation, bounded discovery and SPA cleanup                                                  | Complete under synthetic tests; reference profiling remains                                    |
+| 4 Persistence           | IndexedDB migration, expiry/LRU, local corrections, browser restart coverage                                                      | Complete under automated tests                                                                 |
+| 5 Modes                 | Reversible presentation, ancestor context, Slopometer, zero-inference switching and keyboard controls                             | Complete for conservative alpha semantics                                                      |
+| 6 Evaluation and scorer | Corpus validator, split isolation, experimental train/export, validation calibration, held-out slice/confidence reports and gates | Independent corpus and production-model review required                                        |
+| 7 Reddit                | Nested extraction, 30-level ancestor stress, removal, edits and navigation regressions                                            | Successful current live smoke required                                                         |
+| 8 YouTube               | Independent replies, insertion/expansion, edits/recycling, removal and private-route exclusion                                    | Successful current live smoke required                                                         |
+| 9 LinkedIn              | Feed/comment/reply fixtures and dynamic recycling regressions                                                                     | Permitted authenticated live smoke required                                                    |
+| 10 X                    | Quote separation and dynamic timeline recycling regressions                                                                       | Successful current live smoke required                                                         |
+| 11 Medium               | Article/response fixtures, bounded chunk policy and dynamic response regressions                                                  | Live smoke and article usefulness validation required                                          |
+| 12 Chrome Prompt        | Capability UX, explicit download progress/cancel, fresh cloned sessions, strict outputs, disagreement safeguards and mock tests   | Real eligible hardware, paired quality evaluation and resource profiles required               |
+| 13 Remote boundary      | Isolated mock batching, opaque IDs, dedupe, bounded concurrency, retry/cancel and schemas                                         | Production intentionally disabled by the official-auth gate                                    |
+| 14 Hardening            | Circuit breakers, bounded timing/export, timeout recovery, cache/schema/CSP audit and synthetic benchmark runners                 | Dedicated 30-minute paired reference runs, detached-node profiling and manual security signoff |
+| 15 Release candidate    | Reproducibility hashes, accessibility regressions, model card, disclosure draft, evidence template and release checker            | Release evidence and manual audits must pass; not a public release                             |
+
+## Current external checks
+
+The local development verification completed 52 unit tests and 31 Chromium tests, a twelve-scenario enabled/disabled-processing benchmark matrix, and reproducible packaged-file hashes. A 1,000-unit virtualization diagnostic ran for 1,800.54 seconds; the last recorded post-GC heap sample at 1,740 seconds was 99.4% of the ten-minute sample, with zero remaining runtime bindings after cleanup. This was a development build captured at run start, not a final-head paired reference-machine acceptance. Aggregate results are recorded in `docs/verification-results.json`.
+
+A disposable-profile probe of installed Chrome 155 did not load the unpacked extension through automated command-line flags. No model download was started, and this result does not establish model capability on the machine. Real-model verification requires a normal permitted developer installation and the independent quality corpus.
+
+On 7 October 2026, public signed-out checks returned zero candidate units on Reddit/YouTube, an authentication route on LinkedIn, unavailable navigation on X and HTTP 403 on Medium. These do not validate normal rendered feeds. No authentication or access challenge was bypassed and no live content was copied into fixtures or reports.
+
+The official OpenAI plan-usage flow still requires a loopback callback and keeps credentials out of browser storage. A pure MV3 extension does not satisfy that design. The mock remote contract is not shipped in a production entrypoint, and the manifest adds no network permission. See the [sign-in flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in) and [credential guidance](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions).
+
+## Finishing release acceptance
+
+Supply an independently reviewed, appropriately licensed/consented corpus; run the corpus gates against the classifier actually deployed. Complete permitted live desktop checks across all five platforms. Run paired controls and 1×/4× CPU profiles on the specified reference hardware, including 30-minute heap plateau and detached-node retention. Verify on-device AI on eligible hardware and complete screen-reader/manual accessibility checks.
+
+Record the evidence in `docs/release-evidence.json`. `pnpm release:check` fails while evidence is missing or incompatible, rather than silently treating synthetic smoke tests as release approval. Store publication additionally requires a developer account and final submission details; the listing here remains a draft.
