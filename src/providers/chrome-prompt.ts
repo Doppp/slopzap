@@ -70,7 +70,7 @@ export async function downloadModel(
           progress?.(Math.min(1, Math.max(0, loaded)));
       });
     },
-    initialPrompts: [{ role: 'system', content: INSTRUCTIONS }],
+    initialPrompts: [{ role: 'system', content: BASELINE_INSTRUCTIONS }],
   });
   void pending.then(
     (session) => {
@@ -90,7 +90,9 @@ export class ChromePromptProvider implements Provider {
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   constructor(
     private api: ModelFactory | undefined = factory(),
-    private references = true,
+    // Real development comparisons did not establish a reference benefit.
+    // Guidance is enabled explicitly only by the developer experiment.
+    private references = false,
   ) {}
   async ready(): Promise<boolean> {
     return (

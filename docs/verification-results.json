@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 68, "chromium": 36 },
+  "automatedTests": { "unit": 72, "chromium": 37 },
   "pairedComparison": {
     "inventedCases": 12,
     "alternatingArmOrder": true,
@@ -11,7 +11,13 @@
     "perArmDeadlineMs": 8000,
     "numericExportAndCancellationRegressionsPassed": true,
     "modelResponsesInBrowserTests": "mocked",
-    "realModelComparisonCompleted": false
+    "realModelExecutionVerified": true,
+    "realModelRunsFinished": 3,
+    "realModelComparisonCompleted": false,
+    "realModelRunStatuses": ["incomplete", "incomplete", "incomplete"],
+    "realModelValidPairs": [11, 9, 11],
+    "realModelNumericSnapshot": "evaluation/reports/chrome-reference-2026-10-08.json",
+    "referenceBenefitEstablished": false
   },
   "isolatedWebCapabilityProbe": {
     "scope": "disposable headed and headless empty loopback web pages; not extension or hardware acceptance",
@@ -36,6 +42,7 @@
     "maxReferenceCharacters": 4000,
     "savedLiveComments": 0,
     "onDeviceQualityImprovementVerified": false,
+    "includedInOrdinaryModelPrompts": false,
     "automaticHide": false,
     "developmentSeed": {
       "samples": 24,
@@ -92,9 +99,13 @@
   "onDeviceHardwareAcceptance": false,
   "installedChromeProbe": {
     "version": "155.0.8059.40",
-    "extensionLoadedByAutomatedProbe": false,
-    "modelCapabilityVerified": false,
-    "downloadStarted": false
+    "scope": "isolated packaged-extension diagnostic; not independent quality or resource acceptance",
+    "extensionLoadedByAutomatedProbe": true,
+    "modelCapabilityVerified": true,
+    "downloadStarted": true,
+    "preparationCompleted": true,
+    "normalUserProfileAccessed": false,
+    "isolatedProfileAndModelRemoved": true
   },
   "independentCorpusAcceptance": false
 }

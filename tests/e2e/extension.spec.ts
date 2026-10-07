@@ -609,6 +609,77 @@ test('reference comparison never downloads a model or infers while rendering', a
   ).toEqual([]);
 });
 
+test('ordinary optional model analysis omits experimental reference guidance', async () => {
+  await context.serviceWorkers()[0]!.evaluate(async () => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          storage: {
+            local: {
+              get(key: string): Promise<{ settings: object }>;
+              set(value: object): Promise<void>;
+            };
+          };
+        };
+      }
+    ).chrome;
+    const { settings } = await api.storage.local.get('settings');
+    await api.storage.local.set({ settings: { ...settings, onDevice: true } });
+  });
+  const harness = await context.newPage();
+  await harness.addInitScript(() => {
+    const counters = { prompts: 0, referencePrompts: 0, referenceSessions: 0 };
+    Object.assign(globalThis, { modelCounters: counters });
+    Object.defineProperty(globalThis, 'LanguageModel', {
+      value: {
+        availability: async () => 'available',
+        create: async (options: { initialPrompts: { content: string }[] }) => {
+          if (options.initialPrompts[0]?.content.includes('referenceGuide'))
+            counters.referenceSessions++;
+          return {
+            destroy() {},
+            clone: async () => ({
+              destroy() {},
+              prompt: async (input: string) => {
+                counters.prompts++;
+                const data = JSON.parse(input);
+                if (data.referenceGuide) counters.referencePrompts++;
+                return JSON.stringify({
+                  results: data.items.map((item: { id: string }) => ({
+                    id: item.id,
+                    score: 0.7,
+                    evidence: 0.9,
+                    reasons: [],
+                  })),
+                });
+              },
+            }),
+          };
+        },
+      },
+    });
+  });
+  await harness.goto(`chrome-extension://${extensionId}/harness.html`);
+  const counters = () =>
+    harness.evaluate(
+      () =>
+        (
+          globalThis as unknown as {
+            modelCounters: {
+              prompts: number;
+              referencePrompts: number;
+              referenceSessions: number;
+            };
+          }
+        ).modelCounters,
+    );
+  await expect.poll(async () => (await counters()).prompts).toBeGreaterThan(0);
+  expect(await counters()).toMatchObject({
+    referencePrompts: 0,
+    referenceSessions: 0,
+  });
+});
+
 test('paired comparison exports only numeric results and leaves preferences unchanged', async () => {
   const comparison = await context.newPage();
   await comparison.addInitScript(() => {
