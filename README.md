@@ -51,8 +51,13 @@ pnpm exec playwright install chromium
 pnpm test:e2e                # real Chromium + unpacked production extension
 pnpm eval                    # seed evaluation metrics; no accuracy claim
 node scripts/live-smoke.mjs   # optional public signed-out smoke; never a CI prerequisite
+pnpm benchmark --duration=5   # synthetic controls at 1x/4x CPU
+pnpm reproducibility         # compare two packaged builds
+pnpm release:check           # fails until reviewed release evidence passes
 ```
 
 Browser tests cover the five adapter fixtures, nested branches, insert/remove/edit events, SPA routes, excluded composers, cache reuse, zero-inference mode changes, 1,000 loaded comments, synthetic-feed cleanup and axe accessibility checks. Traces contain invented fixtures only. See [docs/benchmarking.md](docs/benchmarking.md) for the remaining real-machine performance checks.
 
 [ARCHITECTURE.md](ARCHITECTURE.md) explains module ownership. [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/adapter-maintenance.md](docs/adapter-maintenance.md) describe contributions. [SECURITY.md](SECURITY.md) covers vulnerability reporting. MIT licensed.
+
+[Milestone status](docs/milestones.md) separates implemented code from acceptance gates. The [model card](docs/classification.md) describes the provisional scorer and independent-corpus tooling; the [Store disclosure draft](docs/store-disclosure-draft.md) is not a public-release or submission claim. Optional local timing diagnostics and content-free export are available in Settings. On-device preparation shows progress and can be cancelled; setup never starts it automatically.

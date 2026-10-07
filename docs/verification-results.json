@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-07",
+  "releaseReady": false,
+  "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
+  "automatedTests": { "unit": 52, "chromium": 29 },
+  "packagedFileReproducibility": {
+    "passed": true,
+    "files": 22,
+    "zipByteEqualityClaimed": false
+  },
+  "shortBenchmark": {
+    "scenarios": 12,
+    "units": [100, 500, 1000],
+    "cpuRates": [1, 4],
+    "processingEnabledDisabledControls": true,
+    "allRegressionChecksPassed": true,
+    "referenceHardwareAcceptance": false
+  },
+  "longBenchmark": {
+    "sourceReport": "2026-10-07T13-08-33-905Z.json",
+    "scope": "development build captured at run start; a single enabled local diagnostic, not final-head paired reference acceptance",
+    "units": 1000,
+    "durationSeconds": 1800.54,
+    "heapSamples": 30,
+    "finalHeapToTenMinuteRatio": 0.9943410595664516,
+    "cleanupBindings": 0,
+    "candidateLimit": 1000,
+    "allRegressionChecksPassed": true,
+    "referenceHardwareAcceptance": false
+  },
+  "liveSmoke": {
+    "reddit": "HTTP 200, no target candidates; inconclusive",
+    "youtube": "HTTP 200, no target candidates; inconclusive",
+    "linkedin": "authentication wall; not validated",
+    "x": "navigation unavailable; not validated",
+    "medium": "HTTP 403; not validated"
+  },
+  "onDeviceHardwareAcceptance": false,
+  "independentCorpusAcceptance": false
+}

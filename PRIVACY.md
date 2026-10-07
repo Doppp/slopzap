@@ -20,6 +20,8 @@ Quick setup stores only its version and local presentation/completion booleans, 
 
 Page compatibility health keeps at most 100 parse-success booleans and numeric counters in the active tab's memory. The popup can display a fixed failure code and offer a retry. No page text, URLs, identifiers, fingerprints or exception messages enter these diagnostics, and they are not persisted or uploaded.
 
+Timing diagnostics are off by default. When enabled in Settings, at most 128 recent numeric duration samples per metric stay in tab memory. Manual JSON export includes extension/Chrome major versions, platform names, preferences, bounded counts, timings and fixed failure codes for up to 20 supported tabs in the current window. It contains no text, HTML, author data, URLs, fingerprints or model responses and is never uploaded. Review an exported file before deliberately sharing it.
+
 ## Optional Chrome on-device model
 
 Off by default. An explicit options-page click may ask Chrome to download its model. Classification input remains on the device; SlopZap has no cloud inference endpoint. Chrome manages download availability, hardware requirements and model updates. SlopZap does not download or execute remote application code.
