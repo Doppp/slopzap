@@ -611,6 +611,60 @@ test('mode changes preserve content collapsed by the host website', async () => 
   await expect(body).toBeHidden();
 });
 
+test('malformed runtime messages leave preferences and content processing intact', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  const result = await options.evaluate(async () => {
+    const chrome = (
+      globalThis as unknown as {
+        chrome: {
+          runtime: { sendMessage(message: unknown): Promise<unknown> };
+          tabs: {
+            query(options: object): Promise<{ id?: number }[]>;
+            sendMessage(id: number, message: unknown): Promise<unknown>;
+          };
+        };
+      }
+    ).chrome;
+    const before = await chrome.runtime.sendMessage({ type: 'SETTINGS_GET' });
+    for (const message of [
+      { type: 'CLASSIFY_LOCAL', items: [null] },
+      { type: 'CACHE_SAVE', results: [null] },
+      { type: 'SETTINGS_SET', settings: null },
+    ])
+      await chrome.runtime.sendMessage(message).catch(() => undefined);
+    let fixtureTab: number | undefined;
+    for (const tab of await chrome.tabs.query({})) {
+      if (!tab.id) continue;
+      const candidate = await chrome.tabs
+        .sendMessage(tab.id, { type: 'SNAPSHOT' })
+        .catch(() => undefined);
+      if ((candidate as { supported?: boolean } | undefined)?.supported) {
+        fixtureTab = tab.id;
+        break;
+      }
+    }
+    if (!fixtureTab) throw new Error('Missing invented fixture tab');
+    for (const message of [
+      null,
+      { type: 'SETTINGS_CHANGED', settings: null },
+      { type: 'SNAPSHOT', text: 'invented extra field' },
+    ])
+      await chrome.tabs.sendMessage(fixtureTab, message).catch(() => undefined);
+    const after = await chrome.runtime.sendMessage({ type: 'SETTINGS_GET' });
+    const snapshot = await chrome.tabs.sendMessage(fixtureTab, {
+      type: 'SNAPSHOT',
+    });
+    return { before, after, snapshot };
+  });
+  expect(result.after).toEqual(result.before);
+  expect(result.snapshot).toMatchObject({
+    supported: true,
+    settings: result.before,
+  });
+  await expect(page.locator('[data-slopzap-ui]')).not.toHaveCount(0);
+});
+
 test('host scripts cannot spoof local feedback clicks', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const reply = page.locator('shreddit-comment[thingid="reply-1"]');

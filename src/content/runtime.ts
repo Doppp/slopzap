@@ -18,6 +18,7 @@ import { Renderer } from '../rendering/renderer';
 import { AdapterHealth, type AdapterFailure } from './adapter-health';
 import { Metrics } from './metrics';
 import { abortable } from '../shared/async';
+import { parseContentRequest } from '../messaging/protocol';
 import {
   aggregate,
   presentations,
@@ -89,14 +90,19 @@ export class Runtime {
     this.checkRoute();
   }
   private onMessage = (
-    message: { type?: string; settings?: unknown },
+    value: unknown,
     sender: { id?: string; url?: string },
     sendResponse: (response: unknown) => void,
   ): boolean => {
-    if (sender.id !== browser.runtime.id) return false;
+    if (
+      sender.id !== browser.runtime.id ||
+      !sender.url?.startsWith(browser.runtime.getURL('/'))
+    )
+      return false;
+    const message = parseContentRequest(value);
+    if (!message) return false;
     if (message.type === 'RETRY_ADAPTER') {
-      // Only an extension page can explicitly resume a paused route.
-      if (!sender.url?.startsWith(browser.runtime.getURL('/'))) return false;
+      // Only an extension context can explicitly resume a paused route.
       this.cleanupRoute();
       this.pausedRoute = undefined;
       this.health = new AdapterHealth();
