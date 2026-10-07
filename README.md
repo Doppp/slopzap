@@ -46,6 +46,7 @@ pnpm format:check
 pnpm exec playwright install chromium
 pnpm test:e2e                # real Chromium + unpacked production extension
 pnpm eval                    # seed evaluation metrics; no accuracy claim
+node scripts/live-smoke.mjs   # optional public signed-out smoke; never a CI prerequisite
 ```
 
 Browser tests cover the five adapter fixtures, nested branches, insert/remove/edit events, SPA routes, excluded composers, cache reuse, zero-inference mode changes, 1,000 loaded comments, synthetic-feed cleanup and axe accessibility checks. Traces contain invented fixtures only. See [docs/benchmarking.md](docs/benchmarking.md) for the remaining real-machine performance checks.

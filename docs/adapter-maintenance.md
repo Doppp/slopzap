@@ -14,3 +14,7 @@ To fix an adapter:
 Selector preference is semantic attributes, stable IDs, accessible structure, then narrowly scoped platform classes. Return `null` when parsing is ambiguous. Never broaden to arbitrary text or hide a wrapper containing child units.
 
 Current fixtures are invented structural approximations. They verify extraction invariants, not current live-site compatibility. The release checklist requires dated live smoke results for all five platforms.
+
+Run `node scripts/live-smoke.mjs` after a production build for a public, signed-out check. It uses a disposable Chromium profile and logs only status, route-auth flag, candidate count and annotation count. It does not bypass sign-in/access challenges, copy text or persist page HTML.
+
+The 2026-10-07 environment check exposed no candidate units on Reddit or YouTube within the initial load window, reached a LinkedIn authentication route, could not complete X navigation, and received HTTP 403 from Medium. These results are inconclusive for authenticated, normally rendered feeds and do not count as successful live compatibility validation. The adapters correctly left these pages unchanged. Use a permitted signed-in manual smoke session before claiming support is release-ready.
