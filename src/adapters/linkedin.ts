@@ -3,6 +3,8 @@ export const linkedin = createAdapter({
   platform: 'linkedin',
   hosts: ['www.linkedin.com'],
   roots: 'main',
+  sensitiveRoots:
+    '.msg-overlay-container,.msg-overlay-conversation-bubble,.msg-convo-wrapper,[data-view-name="messaging-conversation"]',
   candidates:
     '.feed-shared-update-v2,.comments-comment-item,.comments-comment-entity',
   bodies: [

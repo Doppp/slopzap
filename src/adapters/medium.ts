@@ -3,6 +3,8 @@ export const medium = createAdapter({
   platform: 'medium',
   hosts: ['medium.com'],
   roots: 'main,article',
+  rootTitle: 'article h1',
+  sensitiveRoots: '[data-testid="editor"]',
   candidates: 'article,[data-testid="response"]',
   bodies: [
     '[data-testid="storyContent"]',

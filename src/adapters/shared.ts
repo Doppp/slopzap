@@ -8,7 +8,7 @@ export function sensitiveRoute(url: URL): boolean {
     url.pathname,
   );
 }
-export function authoredText(node: HTMLElement | null): string {
+export function authoredText(node: HTMLElement | null, excluded = ''): string {
   if (!node) return '';
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
   const chunks: string[] = [];
@@ -26,6 +26,7 @@ export function authoredText(node: HTMLElement | null): string {
       )
     )
       continue;
+    if (excluded && parent.closest(excluded)) continue;
     const nextBlock = parent.closest('p,div,li,pre,blockquote,h1,h2,h3');
     if (block && block !== nextBlock) chunks.push('\n');
     const value = current.textContent
@@ -59,6 +60,8 @@ interface Config {
   identity: (node: HTMLElement) => string;
   parent?: (node: HTMLElement) => HTMLElement | null;
   quote?: string;
+  sensitiveRoots?: string;
+  rootTitle?: string;
 }
 export function createAdapter(config: Config): Adapter {
   const bodyOf = (node: HTMLElement | null) =>
@@ -80,17 +83,21 @@ export function createAdapter(config: Config): Adapter {
     candidates: config.candidates,
     matches: (url) =>
       config.hosts.includes(url.hostname) && !sensitiveRoute(url),
+    isSensitive: (node) =>
+      !!node.closest(SENSITIVE) ||
+      !!(config.sensitiveRoots && node.closest(config.sensitiveRoots)),
     routeKey: (url) =>
       `${url.origin}${url.pathname}${config.platform === 'youtube' && url.searchParams.get('v') ? `?v=${encodeURIComponent(url.searchParams.get('v')!)}` : ''}`,
     parse(node): Binding | null {
       if (
         node.closest(SENSITIVE) ||
+        (config.sensitiveRoots && node.closest(config.sensitiveRoots)) ||
         (config.quote && node.closest(config.quote))
       )
         return null;
       const body = bodyOf(node);
       if (!body) return null;
-      const authored = authoredText(body);
+      const authored = authoredText(body, config.sensitiveRoots);
       if (!authored) return null;
       const parent = config.parent
         ? config.parent(node)
@@ -109,11 +116,17 @@ export function createAdapter(config: Config): Adapter {
           id: config.identity(node),
           parentId: parent ? config.identity(parent) || null : null,
           text: authored,
-          parentText: authoredText(bodyOf(parent)).slice(0, 800),
-          rootText: authoredText(
-            document.querySelector<HTMLElement>('h1'),
-          ).slice(0, 500),
-          quotedText: authoredText(quote).slice(0, 600),
+          parentText: authoredText(bodyOf(parent), config.sensitiveRoots).slice(
+            0,
+            800,
+          ),
+          rootText: config.rootTitle
+            ? authoredText(
+                document.querySelector<HTMLElement>(config.rootTitle),
+                config.sensitiveRoots,
+              ).slice(0, 500)
+            : '',
+          quotedText: authoredText(quote, config.sensitiveRoots).slice(0, 600),
         },
       };
     },

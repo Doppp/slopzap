@@ -4,6 +4,7 @@ export const youtube = createAdapter({
   platform: 'youtube',
   hosts: ['www.youtube.com'],
   roots: 'ytd-comments',
+  rootTitle: 'ytd-watch-metadata h1,ytd-watch-flexy h1',
   candidates,
   bodies: ['#content-text'],
   identity: (node) =>

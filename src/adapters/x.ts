@@ -4,6 +4,8 @@ export const x = createAdapter({
   platform: 'x',
   hosts: ['x.com', 'twitter.com'],
   roots: 'main',
+  sensitiveRoots:
+    '[data-testid="DMDrawer"],[data-testid="DmScrollerContainer"],[data-testid="DMConversation"]',
   candidates: 'article[data-testid="tweet"]',
   bodies: ['[data-testid="tweetText"]'],
   quote,

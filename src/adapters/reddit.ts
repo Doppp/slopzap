@@ -3,6 +3,8 @@ export const reddit = createAdapter({
   platform: 'reddit',
   hosts: ['www.reddit.com'],
   roots: 'main,shreddit-app',
+  rootTitle: 'h1',
+  sensitiveRoots: 'shreddit-chat,[data-testid="chat-room"]',
   candidates: 'shreddit-comment,shreddit-post,[data-testid="comment"]',
   bodies: [
     '[slot="comment"]',

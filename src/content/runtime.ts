@@ -180,7 +180,7 @@ export class Runtime {
           record.target.nodeType === Node.ELEMENT_NODE
             ? (record.target as Element)
             : record.target.parentElement;
-        if (target?.closest('[data-slopzap-ui]')) continue;
+        if (target && adapter.isSensitive(target)) continue;
         if (
           [...record.removedNodes].some(
             (node) =>
@@ -243,13 +243,15 @@ export class Runtime {
         if (!this.scan) {
           const root = this.dirty.shift();
           if (!(root instanceof HTMLElement) || !root.isConnected) continue;
+          if (this.adapter?.isSensitive(root)) continue;
           this.registerCandidate(root);
           this.scan = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
             acceptNode: (node) =>
               node instanceof Element &&
-              node.matches(
-                'form,[contenteditable]:not([contenteditable="false"]),[data-slopzap-ui],script,style',
-              )
+              (this.adapter?.isSensitive(node) ||
+                node.matches(
+                  'form,[contenteditable]:not([contenteditable="false"]),[data-slopzap-ui],script,style',
+                ))
                 ? NodeFilter.FILTER_REJECT
                 : NodeFilter.FILTER_ACCEPT,
           });
@@ -265,6 +267,7 @@ export class Runtime {
     if (
       !this.adapter ||
       !node.matches(this.adapter.candidates) ||
+      this.adapter.isSensitive(node) ||
       this.candidates.has(node) ||
       node.closest(
         'form,[contenteditable]:not([contenteditable="false"]),[data-slopzap-ui]',

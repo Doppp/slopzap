@@ -155,6 +155,29 @@ for (const scenario of [
       await expect(
         page.locator('[data-testid="quoteTweet"] [data-slopzap-ui]'),
       ).toHaveCount(0);
+    if (['linkedin', 'x'].includes(scenario.platform)) {
+      const before = (await snapshot()).stats.candidates;
+      await page.evaluate((platform) => {
+        const privatePanel = document.createElement('section');
+        if (platform === 'x') {
+          privatePanel.dataset.testid = 'DMDrawer';
+          privatePanel.innerHTML =
+            '<article data-testid="tweet"><div data-testid="tweetText">A private message with plenty of text must never be classified.</div></article>';
+        } else {
+          privatePanel.className = 'msg-overlay-container';
+          privatePanel.innerHTML =
+            '<div class="comments-comment-item"><div class="comments-comment-item__main-content">A private message with plenty of text must never be classified.</div></div>';
+        }
+        document.querySelector('main')!.append(privatePanel);
+      }, scenario.platform);
+      await page.waitForTimeout(100);
+      expect((await snapshot()).stats.candidates).toBe(before);
+      await expect(
+        page.locator(
+          '[data-testid="DMDrawer"] [data-slopzap-ui],.msg-overlay-container [data-slopzap-ui]',
+        ),
+      ).toHaveCount(0);
+    }
   });
 
 test('edited text invalidates the exact-item correction', async () => {
@@ -254,4 +277,14 @@ test('mode changes preserve content collapsed by the host website', async () => 
   await expect(body).toBeHidden();
   await mode('Slop Goggles');
   await expect(body).toBeHidden();
+});
+
+test('host scripts cannot spoof local feedback clicks', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .evaluate((button) => (button as HTMLElement).click());
+  await mode('Slop Blocker');
+  await expect(reply.locator('[slot="comment"]')).toBeVisible();
 });

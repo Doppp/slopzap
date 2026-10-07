@@ -13,5 +13,6 @@ export interface Adapter {
   candidates: string;
   matches(url: URL): boolean;
   routeKey(url: URL): string;
+  isSensitive(node: Element): boolean;
   parse(node: HTMLElement): Binding | null;
 }
