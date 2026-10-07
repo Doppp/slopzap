@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-08",
+  "chromeVersion": "155.0.8059.40",
+  "scope": "isolated windowed installed-Chrome signed-out observations; not live compatibility or release acceptance",
+  "runtimeRevision": "c25261884958a92e04602c2afa29ee6e68b19c27",
+  "runtimeRevisionNote": "runtime files were tested before commit; the committed runtime is identical",
+  "onDevice": false,
+  "debug": false,
+  "normalUserProfileAccessed": false,
+  "modelCreationRequested": false,
+  "storedLiveText": false,
+  "storedLiveHtml": false,
+  "storedLiveScreenshots": false,
+  "isolatedProfileRemoved": true,
+  "fixtureControl": {
+    "scope": "invented route fulfilled locally; not a live page",
+    "extensionInjectionVerified": true,
+    "runtime": {
+      "supported": true,
+      "platform": "reddit",
+      "stats": {
+        "bound": 3,
+        "candidates": 3,
+        "classifications": 3
+      },
+      "health": {
+        "code": null,
+        "sampled": 3,
+        "rejected": 0,
+        "consecutiveFailures": 0
+      }
+    }
+  },
+  "observations": [
+    {
+      "site": "reddit",
+      "status": 200,
+      "outcome": "possible_access_challenge",
+      "domCandidates": 0,
+      "annotations": 0,
+      "authRoute": false,
+      "challengeFramePresent": true,
+      "domSnapshotAvailable": true,
+      "runtime": {
+        "supported": true,
+        "platform": "reddit",
+        "stats": {
+          "bound": 0,
+          "candidates": 0,
+          "classifications": 0
+        },
+        "health": {
+          "code": null,
+          "sampled": 0,
+          "rejected": 0,
+          "consecutiveFailures": 0
+        }
+      },
+      "liveAcceptance": false
+    },
+    {
+      "site": "youtube",
+      "status": 200,
+      "outcome": "no_target_units",
+      "domCandidates": 0,
+      "annotations": 0,
+      "authRoute": false,
+      "challengeFramePresent": false,
+      "domSnapshotAvailable": true,
+      "runtime": {
+        "supported": true,
+        "platform": "youtube",
+        "stats": {
+          "bound": 0,
+          "candidates": 0,
+          "classifications": 0
+        },
+        "health": {
+          "code": null,
+          "sampled": 0,
+          "rejected": 0,
+          "consecutiveFailures": 0
+        }
+      },
+      "liveAcceptance": false
+    },
+    {
+      "site": "linkedin",
+      "status": 200,
+      "outcome": "authentication_route",
+      "domCandidates": 0,
+      "annotations": 0,
+      "authRoute": true,
+      "challengeFramePresent": false,
+      "domSnapshotAvailable": true,
+      "runtime": {
+        "supported": false,
+        "platform": null,
+        "stats": {
+          "bound": 0,
+          "candidates": 0,
+          "classifications": 0
+        },
+        "health": {
+          "code": null,
+          "sampled": 0,
+          "rejected": 0,
+          "consecutiveFailures": 0
+        }
+      },
+      "liveAcceptance": false
+    },
+    {
+      "site": "x",
+      "status": 200,
+      "outcome": "no_target_units",
+      "domCandidates": 0,
+      "annotations": 0,
+      "authRoute": false,
+      "challengeFramePresent": false,
+      "domSnapshotAvailable": true,
+      "runtime": {
+        "supported": true,
+        "platform": "x",
+        "stats": {
+          "bound": 0,
+          "candidates": 0,
+          "classifications": 0
+        },
+        "health": {
+          "code": null,
+          "sampled": 0,
+          "rejected": 0,
+          "consecutiveFailures": 0
+        }
+      },
+      "liveAcceptance": false
+    },
+    {
+      "site": "medium",
+      "status": 200,
+      "outcome": "possible_access_challenge",
+      "domCandidates": 0,
+      "annotations": 0,
+      "authRoute": false,
+      "challengeFramePresent": true,
+      "domSnapshotAvailable": true,
+      "runtime": {
+        "supported": true,
+        "platform": "medium",
+        "stats": {
+          "bound": 0,
+          "candidates": 0,
+          "classifications": 0
+        },
+        "health": {
+          "code": null,
+          "sampled": 0,
+          "rejected": 0,
+          "consecutiveFailures": 0
+        }
+      },
+      "liveAcceptance": false
+    }
+  ],
+  "liveAcceptance": false,
+  "releaseReady": false
+}
