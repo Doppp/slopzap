@@ -14,10 +14,18 @@
     "realModelComparisonCompleted": false
   },
   "isolatedWebCapabilityProbe": {
-    "scope": "disposable headless empty loopback web page; not extension or hardware acceptance",
+    "scope": "disposable headed and headless empty loopback web pages; not extension or hardware acceptance",
+    "launchPolicy": "normal Chrome model services and sandbox; no eligibility overrides",
     "chromeVersion": "155.0.8059.40",
     "apiPresent": true,
-    "availability": "unavailable",
+    "availability": "downloadable",
+    "previousUnavailableResult": "confounded by Playwright default model-service suppressions",
+    "separateIsolatedInternalsDiagnostic": {
+      "deviceCapable": true,
+      "enoughVram": true,
+      "enoughDiskSpace": true,
+      "modelInstalled": false
+    },
     "modelCreationRequested": false,
     "downloadRequested": false
   },
