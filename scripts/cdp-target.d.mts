@@ -10,6 +10,13 @@ export interface TargetTransport {
   on(event: string, listener: (event: TargetEvent) => void): unknown;
   off(event: string, listener: (event: TargetEvent) => void): unknown;
 }
+export function validateProbeDeadline(deadlineMs: number): void;
+export function targetCommand(
+  browser: Pick<TargetTransport, 'send'>,
+  method: string,
+  params: Record<string, unknown>,
+  deadlineMs?: number,
+): Promise<Record<string, unknown>>;
 export function targetSession(
   browser: TargetTransport,
   targetId: string,

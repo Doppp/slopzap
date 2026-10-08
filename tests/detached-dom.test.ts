@@ -127,3 +127,13 @@ test.each(['attach', 'detach'])(
     }
   },
 );
+test.each([0, -1, 1.5, NaN, Infinity, 60_001])(
+  'invalid DOM deadline %s fails before creating a session',
+  async (deadline) => {
+    const { context, calls } = mock();
+    await expect(sampleDetachedDom(context, page, deadline)).rejects.toThrow(
+      'Probe deadline unavailable',
+    );
+    expect(calls).toHaveLength(0);
+  },
+);
