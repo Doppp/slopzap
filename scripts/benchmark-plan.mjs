@@ -5,6 +5,7 @@ export function benchmarkPlan(argv) {
     '--chrome',
     '--with-absent',
     '--worker-heap',
+    '--detached-dom',
   ];
   if (
     argv.some(
@@ -52,6 +53,7 @@ export function benchmarkPlan(argv) {
     seconds,
     chrome: argv.includes('--chrome'),
     workerHeap: argv.includes('--worker-heap'),
+    detachedDom: argv.includes('--detached-dom'),
     mode: argv.includes('--paired-long')
       ? 'paired-long'
       : long

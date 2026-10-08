@@ -15,6 +15,7 @@ import { installFrameProbe } from './benchmark-frames.mjs';
 import { installationEvidence } from './benchmark-installation.mjs';
 import { sampleWorkerHeap } from './worker-heap.mjs';
 import { fixtureSnapshot } from './benchmark-snapshot.mjs';
+import { sampleDetachedDom } from './detached-dom.mjs';
 const plan = benchmarkPlan(process.argv.slice(2));
 const { long, seconds, scenarios } = plan;
 const reportRoot = resolve('.output/benchmarks');
@@ -264,10 +265,16 @@ for (const scenario of scenarios) {
       candidates: final?.stats?.candidates ?? null,
       workerHeap: await workerHeap(),
     });
+    const detachedDomBeforeCleanup = plan.detachedDom
+      ? await sampleDetachedDom(context, page)
+      : null;
     await page.evaluate(() => document.querySelector('main').replaceChildren());
     await page.waitForTimeout(300);
     const cleaned = await snapshot();
     await cdp.send('HeapProfiler.collectGarbage');
+    const detachedDomAfterCleanup = plan.detachedDom
+      ? await sampleDetachedDom(context, page)
+      : null;
     const tracePath = join(reportRoot, `${stamp}-${results.length}.zip`);
     await context.tracing.stop({ path: tracePath });
     const atTenMinutes = samples.find((sample) => sample.elapsedSeconds >= 600);
@@ -278,6 +285,13 @@ for (const scenario of scenarios) {
         : null;
     const checks = {
       framesObserved: frame.samples > 0,
+      ...(plan.detachedDom
+        ? {
+            detachedDomEvidenceAvailable:
+              detachedDomBeforeCleanup?.status === 'measured' &&
+              detachedDomAfterCleanup?.status === 'measured',
+          }
+        : {}),
       ...(plan.workerHeap
         ? {
             workerHeapEvidenceAvailable: scenario.installed
@@ -346,6 +360,10 @@ for (const scenario of scenarios) {
       frames: frame,
       samples,
       initialWorkerHeap,
+      detachedDom: {
+        beforeCleanup: detachedDomBeforeCleanup,
+        afterCleanup: detachedDomAfterCleanup,
+      },
       plateauRatio,
       checks,
       trace: tracePath.split('/').at(-1),
@@ -371,7 +389,7 @@ await writeFile(
   path,
   JSON.stringify(
     {
-      schemaVersion: 2,
+      schemaVersion: 3,
       packagedBuildSha256,
       packagedBuildUnchanged: true,
       environment: {
@@ -400,6 +418,16 @@ await writeFile(
           attachment:
             'attach/detach per sample; no deliberate wake-up or continuous debugger attachment',
           lifecyclePerturbed: plan.workerHeap,
+        },
+        detachedDomProbe: {
+          enabled: plan.detachedDom,
+          scope:
+            'renderer-wide post-GC detached trees and unique retained node IDs; not attributed SlopZap bindings',
+          attachment:
+            'fresh page debugger session per pre/post-cleanup sample; detached immediately',
+          timingScope:
+            'outside frame observation interval; forced GC and inspector node tracking perturb memory',
+          releaseAcceptance: false,
         },
       },
       generatedAt: new Date().toISOString(),
