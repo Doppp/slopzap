@@ -17,11 +17,19 @@ At a 320 CSS-pixel viewport, `popup.html` previously produced a 350-pixel docume
 | Injected controls on light and dark hosts  | Meaningful button names, logical Tab order, focus can leave controls, host key events remain unprevented, no extra classification |
 | Existing regressions                       | Keyboard correction/reveal focus, forced colors, reduced motion, enlarged fonts and keyboard-only setup                           |
 
-The zoom tests use Chrome's native [`tabs.setZoom` and per-tab zoom settings](https://developer.chrome.com/docs/extensions/reference/api/tabs#method-setZoom), not CSS transforms or font-size substitution. These APIs are used only by tests in disposable extension profiles; no production zoom feature or additional permission is shipped. `popup.html` is tested in a browser tab, not the toolbar popup window.
+The zoom tests use Chrome's native [`tabs.setZoom` and per-tab zoom settings](https://developer.chrome.com/docs/extensions/reference/api/tabs#method-setZoom), not CSS transforms or font-size substitution. These APIs are used only by tests in disposable extension profiles; no production zoom feature or additional permission is shipped. Those zoom/reflow cases load `popup.html` in a browser tab. The separate same-day native-toolbar check below opens the actual popup window.
 
 Screenshots contain only invented fixtures and extension UI. Targeted inspections covered the 400% popup/onboarding viewport captures, dark-host controls and narrow mocked comparison tables. Viewport captures verify the visible fold; they are not full-page visual inspections. Automated document-width and axe checks cover the remainder.
 
-## Manual audit still required
+## Native toolbar smoke
+
+`pnpm toolbar:smoke` loads the packaged extension in an isolated installed, windowed Chrome profile and opens the real action popup using [`chrome.action.openPopup`](https://developer.chrome.com/docs/extensions/reference/api/action#method-openPopup). Its active discussion is a locally fulfilled invented fixture, not a live site. The normal browser profile is untouched, model preparation is never requested and cleanup removes the temporary profile. No raw accessibility tree or live content is exported.
+
+Chrome 155.0.8059.40 passed all fifteen checks: 350 CSS-pixel width without horizontal overflow, active-discussion projection, meaningful mode/Settings names, a non-live Slopometer, Tab/Enter mode switching and saved settings with zero new classification, exposed pressed state, a reachable/scrolled Settings footer and visible keyboard focus. The native popup had a 600-pixel viewport and 725-pixel content height; vertical scrolling is expected. The [numeric snapshot](native-toolbar-results-2026-10-08.json) keeps manual screen-reader and release acceptance false. The local screenshot under `.output/verification/native-toolbar-popup.png` was visually inspected for the footer focus indicator and unclipped controls.
+
+DevTools-generated keyboard input must include Enter's character payload; an initial driver omitted it. Chrome's accessibility pressed state may use the exact string `"true"` rather than a boolean; the check accepts those explicit true forms, not general coercion. These driver corrections are not product scoring or accessibility-policy changes.
+
+## Remaining manual audit
 
 - Use a screen reader to navigate setup, Settings and the real toolbar popup; check headings, groups, selected modes, form labels, errors and user-triggered status messages.
 - Inspect injected score/correction/reveal controls in a permitted public discussion. Confirm Show/Hide expanded state, logical reading order, ancestor context and focus recovery without unsolicited score announcements.

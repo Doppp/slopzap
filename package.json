@@ -21,6 +21,7 @@
     "release:check": "tsx scripts/release-check.ts",
     "model:probe": "node scripts/probe-model.mjs",
     "live:smoke": "tsx scripts/live-smoke.ts",
+    "toolbar:smoke": "node scripts/toolbar-smoke.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && node scripts/check-build.mjs",
     "postinstall": "wxt prepare"
   },

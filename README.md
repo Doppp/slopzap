@@ -51,6 +51,7 @@ pnpm exec playwright install chromium
 pnpm test:e2e                # real Chromium + unpacked production extension
 pnpm eval                    # seed evaluation metrics; no accuracy claim
 pnpm live:smoke              # optional isolated-Chrome public smoke; never release approval
+pnpm toolbar:smoke           # actual Chrome popup; invented active discussion only
 pnpm benchmark --duration=5   # synthetic controls at 1x/4x CPU
 pnpm reproducibility         # compare two packaged builds
 pnpm release:check           # fails until reviewed release evidence passes

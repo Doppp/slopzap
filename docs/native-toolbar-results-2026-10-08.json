@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-08T06:38:37.706Z",
+  "chromeVersion": "155.0.8059.40",
+  "scope": "isolated installed headed Chrome; real toolbar popup with invented active discussion",
+  "dimensions": {
+    "width": 350,
+    "height": 600,
+    "contentWidth": 350,
+    "contentHeight": 725,
+    "focused": true,
+    "modesLoaded": true,
+    "activeDiscussion": true,
+    "liveMeter": false
+  },
+  "checks": {
+    "nativePopupOpened": true,
+    "preferredWidth": true,
+    "noHorizontalOverflow": true,
+    "activeDiscussion": true,
+    "modesLoaded": true,
+    "nonLiveMeter": true,
+    "modeNamesPresent": true,
+    "settingsNamed": true,
+    "keyboardModeReached": true,
+    "keyboardModeSaved": true,
+    "noInferenceOnModeSwitch": true,
+    "selectedModeStateExposed": true,
+    "keyboardFooterReached": true,
+    "footerScrolledIntoView": true,
+    "keyboardFocusVisible": true
+  },
+  "normalUserProfileAccessed": false,
+  "liveContentAccessed": false,
+  "modelPreparationRequested": false,
+  "manualScreenReaderAudit": false,
+  "releaseAcceptance": false
+}
