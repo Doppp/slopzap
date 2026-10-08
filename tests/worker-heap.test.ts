@@ -188,3 +188,53 @@ test('invalid identity fails before querying targets', async () => {
   ).rejects.toThrow('Worker identity unavailable');
   expect(browser.commands).toHaveLength(0);
 });
+test('silent target discovery expires as unavailable without attaching', async () => {
+  const browser = new Transport();
+  browser.send = async (method) => {
+    browser.commands.push({ method, params: {} });
+    return new Promise(() => {});
+  };
+  expect(await sampleWorkerHeap(browser, extensionId, 5)).toEqual({
+    status: 'unavailable',
+    heap: null,
+    debuggerAttached: false,
+  });
+  expect(browser.commands.map((command) => command.method)).toEqual([
+    'Target.getTargets',
+  ]);
+});
+test('silent attachment aborts with controlled text to close the disposable profile', async () => {
+  const browser = new Transport();
+  const send = browser.send.bind(browser);
+  browser.send = async (method, params) =>
+    method === 'Target.attachToTarget'
+      ? new Promise(() => {})
+      : send(method, params);
+  await expect(sampleWorkerHeap(browser, extensionId, 5)).rejects.toThrow(
+    'Worker debugger attach unavailable',
+  );
+  expect(browser.listenerCount('Target.receivedMessageFromTarget')).toBe(0);
+});
+test.each(['', 'x'.repeat(2049)])(
+  'invalid discovered target identity is ambiguous, never attaches %#',
+  async (targetId) => {
+    const browser = new Transport();
+    browser.targets = [{ ...ownWorker, targetId }];
+    expect((await sampleWorkerHeap(browser, extensionId)).status).toBe(
+      'ambiguous',
+    );
+    expect(browser.commands.map((command) => command.method)).toEqual([
+      'Target.getTargets',
+    ]);
+  },
+);
+test.each([0, -1, 1.5, NaN, Infinity, 60_001])(
+  'invalid worker deadline %s fails before discovery',
+  async (deadline) => {
+    const browser = new Transport();
+    await expect(
+      sampleWorkerHeap(browser, extensionId, deadline),
+    ).rejects.toThrow('Probe deadline unavailable');
+    expect(browser.commands).toHaveLength(0);
+  },
+);

@@ -1,4 +1,8 @@
-import { targetSession } from './cdp-target.mjs';
+import {
+  targetSession,
+  targetCommand,
+  validateProbeDeadline,
+} from './cdp-target.mjs';
 
 const empty = (status) => ({ status, heap: null, debuggerAttached: false });
 export async function sampleWorkerHeap(
@@ -6,12 +10,18 @@ export async function sampleWorkerHeap(
   extensionId,
   deadlineMs = 5000,
 ) {
+  validateProbeDeadline(deadlineMs);
   // No fallback to a page, built-in component or unrelated service worker.
   if (typeof extensionId !== 'string' || !/^[a-p]{32}$/.test(extensionId))
     throw new Error('Worker identity unavailable');
   let candidates;
   try {
-    const { targetInfos } = await browser.send('Target.getTargets', {});
+    const { targetInfos } = await targetCommand(
+      browser,
+      'Target.getTargets',
+      {},
+      deadlineMs,
+    );
     if (!Array.isArray(targetInfos)) return empty('unavailable');
     candidates = targetInfos.filter(
       (target) =>
@@ -22,7 +32,12 @@ export async function sampleWorkerHeap(
     return empty('unavailable');
   }
   if (!candidates.length) return empty('not_running');
-  if (candidates.length !== 1 || typeof candidates[0].targetId !== 'string')
+  if (
+    candidates.length !== 1 ||
+    typeof candidates[0].targetId !== 'string' ||
+    !candidates[0].targetId ||
+    candidates[0].targetId.length > 2048
+  )
     return empty('ambiguous');
   const session = targetSession(browser, candidates[0].targetId, deadlineMs);
   let attached = false;
@@ -64,7 +79,7 @@ export async function sampleWorkerHeap(
   } finally {
     // A failed detach aborts the scenario; never continue a long run with an
     // unintentionally debugger-held worker. The caller closes its profile.
-    if (!(await session.close()))
+    if (!(await session.close()) && attached)
       throw new Error('Worker debugger detach unavailable');
   }
 }
