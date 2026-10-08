@@ -18,6 +18,7 @@ export default tseslint.config(
         {
           patterns: [
             '**/cache/**',
+            '**/state/**',
             '**/providers/**',
             '**/classifier/**',
             '**/scoring/**',

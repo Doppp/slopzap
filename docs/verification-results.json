@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 83, "chromium": 53 },
+  "automatedTests": { "unit": 125, "chromium": 53 },
   "pairedComparison": {
     "inventedCases": 12,
     "alternatingArmOrder": true,
@@ -77,6 +77,19 @@
     "checkoutPersistCredentials": false,
     "actionManifestsUseNode24": true,
     "manualSecuritySignoff": false
+  },
+  "architecturePolicyValidation": {
+    "sourceReport": "docs/architecture-review-2026-10-08.md",
+    "scope": "structural build/source regression checks; not full data-flow analysis or manual approval",
+    "addedUnitRegressions": 42,
+    "transitiveImportBoundariesPassed": true,
+    "aliasAndIndirectHelperRegressionsPassed": true,
+    "mockRemoteExcludedFromEntrypoints": true,
+    "reviewedManifestWiringPassed": true,
+    "requiredPackagedEntrypoints": 7,
+    "missingFileAndSymlinkRegressionsPassed": true,
+    "productionRuntimeChanged": false,
+    "manualArchitectureSignoff": false
   },
   "accessibilityRegressionValidation": {
     "sourceReport": "docs/accessibility-review-2026-10-08.md",
