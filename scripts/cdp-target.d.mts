@@ -17,7 +17,7 @@ export function targetSession(
 ): {
   connect(): Promise<void>;
   send(method: string, params?: Record<string, unknown>): Promise<unknown>;
-  close(): Promise<void>;
+  close(): Promise<boolean>;
 };
 export function keyEvents(
   key: string,

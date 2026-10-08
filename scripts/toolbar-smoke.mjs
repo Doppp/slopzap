@@ -203,7 +203,7 @@ try {
     if (Object.values(checks).some((value) => value !== true))
       process.exitCode = 1;
   } finally {
-    await session.close();
+    if (!(await session.close())) throw new Error('Target detach unavailable');
   }
 } catch {
   console.log(

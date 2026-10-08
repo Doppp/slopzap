@@ -51,7 +51,7 @@ test.each(['error', 'reject'] as const)(
     const session = targetSession(transport, 'invented-target');
     await session.connect();
     await expect(session.send('Runtime.evaluate')).rejects.toThrow(
-      reply === 'error' ? 'Popup command failed' : 'Popup transport failed',
+      reply === 'error' ? 'Target command failed' : 'Target transport failed',
     );
     await session.close();
   },
@@ -62,7 +62,7 @@ test('unanswered commands expire with a bounded deadline', async () => {
   const session = targetSession(transport, 'invented-target', 10);
   await session.connect();
   await expect(session.send('Runtime.evaluate')).rejects.toThrow(
-    'Popup command timed out',
+    'Target command timed out',
   );
   await session.close();
 });
@@ -72,12 +72,12 @@ test('closing rejects pending commands and prevents later use', async () => {
   const session = targetSession(transport, 'invented-target');
   await session.connect();
   const pending = expect(session.send('Runtime.evaluate')).rejects.toThrow(
-    'Popup session closed',
+    'Target session closed',
   );
   await session.close();
   await pending;
   await expect(session.send('Runtime.evaluate')).rejects.toThrow(
-    'Popup session unavailable',
+    'Target session unavailable',
   );
 });
 test('keyboard Enter carries its character while Tab stays non-textual', () => {
@@ -89,3 +89,25 @@ test('keyboard Enter carries its character while Tab stays non-textual', () => {
   expect(keyEvents('Tab', 'Tab', 9)[0]).not.toHaveProperty('text');
   expect(keyEvents('Enter', 'Enter', 13)[1]).toMatchObject({ type: 'keyUp' });
 });
+test.each(['reject', 'silent'] as const)(
+  'detach %s reports failure within its deadline and releases listeners',
+  async (mode) => {
+    class FailingDetach extends Transport {
+      override async send(
+        method: string,
+        params: Record<string, unknown>,
+      ): Promise<Record<string, unknown>> {
+        if (method === 'Target.detachFromTarget') {
+          if (mode === 'reject') throw new Error('invented private detail');
+          return new Promise(() => undefined);
+        }
+        return super.send(method, params);
+      }
+    }
+    const transport = new FailingDetach();
+    const session = targetSession(transport, 'invented-target', 10);
+    await session.connect();
+    expect(await session.close()).toBe(false);
+    expect(transport.listenerCount('Target.receivedMessageFromTarget')).toBe(0);
+  },
+);
