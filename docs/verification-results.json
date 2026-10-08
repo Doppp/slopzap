@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 83, "chromium": 43 },
+  "automatedTests": { "unit": 83, "chromium": 53 },
   "pairedComparison": {
     "inventedCases": 12,
     "alternatingArmOrder": true,
@@ -78,9 +78,22 @@
     "actionManifestsUseNode24": true,
     "manualSecuritySignoff": false
   },
+  "accessibilityRegressionValidation": {
+    "sourceReport": "docs/accessibility-review-2026-10-08.md",
+    "scope": "automated invented-content coverage and targeted screenshot inspection; not a manual screen-reader audit",
+    "newBrowserTests": 10,
+    "extensionPages": ["popup", "options", "onboarding", "comparison"],
+    "narrowViewportCssPixels": 320,
+    "nativeBrowserZoomFactors": [2, 4],
+    "allOnboardingSteps": true,
+    "mockedComparisonTablesContained": true,
+    "lightAndDarkHostKeyboardRegressionsPassed": true,
+    "actualToolbarPopupWindowValidated": false,
+    "manualAccessibilitySignoff": false
+  },
   "shortBenchmark": {
-    "scope": "security/privacy development build; short regression checks, not reference-hardware acceptance",
-    "sourceReport": "2026-10-08T01-44-51-863Z.json",
+    "scope": "accessibility development build; short regression checks, not reference-hardware acceptance",
+    "sourceReport": "2026-10-08T02-19-40-647Z.json",
     "scenarios": 12,
     "units": [100, 500, 1000],
     "cpuRates": [1, 4],
