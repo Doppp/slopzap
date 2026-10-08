@@ -7,3 +7,5 @@ Webpage content and model responses are untrusted. Content scripts run in an iso
 The threat model includes malicious page markup, injected instructions, stale asynchronous results, oversized input, model output manipulation, dependency compromise and misleading annotations. Automatic classification hiding is gated pending evaluation. Local corrections are user actions.
 
 Before a stable release, audit runtime messaging, dependency changes, permission scope, host restoration, sensitive-route exclusions, model lifecycle and storage retention. Do not treat open Shadow DOM as a credential boundary; injected UI contains no secrets.
+
+The [8 October 2026 boundary review](docs/security-review-2026-10-08.md) records targeted implementation hardening and verification. It does not replace independent security/privacy signoff.

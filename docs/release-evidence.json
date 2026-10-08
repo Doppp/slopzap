@@ -13,23 +13,23 @@
   "live": {
     "reddit": {
       "passed": false,
-      "evidence": "2026-10-07 signed-out smoke: HTTP 200, zero candidate units; inconclusive"
+      "evidence": "2026-10-08 installed-Chrome smoke: HTTP 200, possible challenge frame, zero target units; inconclusive"
     },
     "youtube": {
       "passed": false,
-      "evidence": "2026-10-07 signed-out smoke: HTTP 200, zero candidate units; inconclusive"
+      "evidence": "2026-10-08 installed-Chrome smoke: HTTP 200, zero target units; inconclusive"
     },
     "linkedin": {
       "passed": false,
-      "evidence": "2026-10-07 signed-out smoke: authentication wall; not validated"
+      "evidence": "2026-10-08 installed-Chrome smoke: HTTP 200, excluded authentication route, zero processing; not validated"
     },
     "x": {
       "passed": false,
-      "evidence": "2026-10-07 signed-out smoke: navigation unavailable; not validated"
+      "evidence": "2026-10-08 installed-Chrome smoke: HTTP 200, zero target units; inconclusive"
     },
     "medium": {
       "passed": false,
-      "evidence": "2026-10-07 signed-out smoke: HTTP 403; not validated"
+      "evidence": "2026-10-08 installed-Chrome smoke: HTTP 200, possible challenge frame, zero target units; inconclusive"
     }
   },
   "reviews": {
