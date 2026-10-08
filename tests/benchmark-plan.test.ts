@@ -19,6 +19,7 @@ test('paired long plan has both processing controls at both renderer CPU rates',
     long: true,
     seconds: 1800,
     chrome: true,
+    workerHeap: false,
     mode: 'paired-long',
     scenarios: [
       { installed: true, enabled: false, throttle: 1, units: 1000 },
@@ -33,6 +34,17 @@ test('legacy single long diagnostic remains explicit and can be smoked briefly',
     { installed: true, enabled: true, throttle: 1, units: 1000 },
   ]);
   expect(benchmarkPlan(['--paired-long', '--duration=1']).seconds).toBe(1);
+});
+test('worker heap diagnostics are opt-in and do not change the scenario matrix', () => {
+  expect(benchmarkPlan([]).workerHeap).toBe(false);
+  const plan = benchmarkPlan([
+    '--paired-long',
+    '--with-absent',
+    '--worker-heap',
+  ]);
+  expect(plan.workerHeap).toBe(true);
+  expect(plan.scenarios).toHaveLength(6);
+  expect(() => benchmarkPlan(['--worker-heap', '--worker-heap'])).toThrow();
 });
 test('absent short controls match every size/rate without replacing disabled processing', () => {
   const plan = benchmarkPlan(['--with-absent', '--duration=1']);

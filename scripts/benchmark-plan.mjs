@@ -1,5 +1,11 @@
 export function benchmarkPlan(argv) {
-  const known = ['--long', '--paired-long', '--chrome', '--with-absent'];
+  const known = [
+    '--long',
+    '--paired-long',
+    '--chrome',
+    '--with-absent',
+    '--worker-heap',
+  ];
   if (
     argv.some(
       (value) =>
@@ -45,6 +51,7 @@ export function benchmarkPlan(argv) {
     long,
     seconds,
     chrome: argv.includes('--chrome'),
+    workerHeap: argv.includes('--worker-heap'),
     mode: argv.includes('--paired-long')
       ? 'paired-long'
       : long

@@ -13,6 +13,8 @@ import { resolve, join } from 'node:path';
 import { benchmarkPlan } from './benchmark-plan.mjs';
 import { installFrameProbe } from './benchmark-frames.mjs';
 import { installationEvidence } from './benchmark-installation.mjs';
+import { sampleWorkerHeap } from './worker-heap.mjs';
+import { fixtureSnapshot } from './benchmark-snapshot.mjs';
 const plan = benchmarkPlan(process.argv.slice(2));
 const { long, seconds, scenarios } = plan;
 const reportRoot = resolve('.output/benchmarks');
@@ -130,7 +132,20 @@ for (const scenario of scenarios) {
           throw new Error('Benchmark settings unavailable');
       }, scenario.enabled);
     }
-    const page = await context.newPage();
+    let page, fixtureTabId;
+    if (controller) {
+      const blank = 'about:blank#slopzap-benchmark-fixture';
+      fixtureTabId = await controller.evaluate(
+        async (url) => (await chrome.tabs.create({ url, active: true })).id,
+        blank,
+      );
+      for (let attempt = 0; !page && attempt < 50; attempt++) {
+        page = context.pages().find((candidate) => candidate.url() === blank);
+        if (!page) await controller.waitForTimeout(100);
+      }
+      if (!page || !Number.isInteger(fixtureTabId) || fixtureTabId <= 0)
+        throw new Error('Benchmark fixture tab unavailable');
+    } else page = await context.newPage();
     await page.route('https://www.reddit.com/**', (route) =>
       route.fulfill({
         contentType: 'text/html',
@@ -153,22 +168,7 @@ for (const scenario of scenarios) {
     await page.bringToFront();
     const snapshot = () =>
       controller
-        ? controller.evaluate(async () => {
-            for (const tab of await chrome.tabs.query({
-              active: true,
-              lastFocusedWindow: true,
-            }))
-              if (tab.id) {
-                try {
-                  return await chrome.tabs.sendMessage(tab.id, {
-                    type: 'SNAPSHOT',
-                  });
-                } catch {
-                  /* tab warming */
-                }
-              }
-            return null;
-          })
+        ? controller.evaluate(fixtureSnapshot, fixtureTabId)
         : Promise.resolve(null);
     const absentEvidence = async () => {
       if (scenario.installed) return null;
@@ -182,8 +182,27 @@ for (const scenario of scenarios) {
       };
     };
     await page.waitForTimeout(500);
-    const initial = await snapshot();
+    let initial = await snapshot();
+    for (
+      let attempt = 0;
+      scenario.installed && !initial?.stats && attempt < 50;
+      attempt++
+    ) {
+      await page.waitForTimeout(100);
+      initial = await snapshot();
+    }
     const initialAbsent = await absentEvidence();
+    const workerHeap = () =>
+      !plan.workerHeap
+        ? Promise.resolve(null)
+        : !scenario.installed
+          ? Promise.resolve({
+              status: 'not_installed',
+              heap: null,
+              debuggerAttached: false,
+            })
+          : sampleWorkerHeap(browser, extensionId);
+    const initialWorkerHeap = await workerHeap();
     const samples = [];
     await page.evaluate(installFrameProbe);
     const started = Date.now();
@@ -221,6 +240,7 @@ for (const scenario of scenarios) {
           domNodes: dom.nodes,
           bound: state?.stats?.bound ?? null,
           candidates: state?.stats?.candidates ?? null,
+          workerHeap: await workerHeap(),
         });
         nextSample += long ? 60 : 2;
       }
@@ -242,6 +262,7 @@ for (const scenario of scenarios) {
       domNodes: finalDom.nodes,
       bound: final?.stats?.bound ?? null,
       candidates: final?.stats?.candidates ?? null,
+      workerHeap: await workerHeap(),
     });
     await page.evaluate(() => document.querySelector('main').replaceChildren());
     await page.waitForTimeout(300);
@@ -257,6 +278,21 @@ for (const scenario of scenarios) {
         : null;
     const checks = {
       framesObserved: frame.samples > 0,
+      ...(plan.workerHeap
+        ? {
+            workerHeapEvidenceAvailable: scenario.installed
+              ? initialWorkerHeap?.status === 'measured' &&
+                samples.every((sample) =>
+                  ['measured', 'not_running'].includes(
+                    sample.workerHeap?.status,
+                  ),
+                )
+              : initialWorkerHeap?.status === 'not_installed' &&
+                samples.every(
+                  (sample) => sample.workerHeap?.status === 'not_installed',
+                ),
+          }
+        : {}),
       ...(scenario.installed
         ? {
             packagedExtensionRegistered:
@@ -309,6 +345,7 @@ for (const scenario of scenarios) {
       },
       frames: frame,
       samples,
+      initialWorkerHeap,
       plateauRatio,
       checks,
       trace: tracePath.split('/').at(-1),
@@ -356,6 +393,14 @@ await writeFile(
         ),
         frameScope:
           'full observation interval; fixed 0.1 ms histogram; over-33-ms ratio is a proxy, not measured dropped frames',
+        workerHeapProbe: {
+          enabled: plan.workerHeap,
+          scope:
+            'exact SlopZap service-worker V8 isolate; post-GC counters, not process RAM, CPU, model cost or IndexedDB disk usage',
+          attachment:
+            'attach/detach per sample; no deliberate wake-up or continuous debugger attachment',
+          lifecyclePerturbed: plan.workerHeap,
+        },
       },
       generatedAt: new Date().toISOString(),
       results,

@@ -8,6 +8,7 @@ export interface BenchmarkPlan {
   long: boolean;
   seconds: number;
   chrome: boolean;
+  workerHeap: boolean;
   mode: 'short' | 'single-long' | 'paired-long';
   scenarios: BenchmarkScenario[];
 }
