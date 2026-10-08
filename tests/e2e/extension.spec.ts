@@ -994,6 +994,65 @@ test('malformed runtime messages leave preferences and content processing intact
   await expect(page.locator('[data-slopzap-ui]')).not.toHaveCount(0);
 });
 
+test('cache messaging rejects arbitrary version text without persisting it', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  const result = await options.evaluate(async () => {
+    const api = (
+      globalThis as unknown as {
+        chrome: {
+          runtime: {
+            sendMessage(input: object): Promise<{ ok?: boolean } | undefined>;
+          };
+        };
+      }
+    ).chrome;
+    const key = 'e'.repeat(64);
+    let accepted = false;
+    try {
+      accepted =
+        (
+          await api.runtime.sendMessage({
+            type: 'CACHE_SAVE',
+            results: [
+              {
+                fingerprint: key,
+                status: 'classified',
+                score: 0.7,
+                evidence: 0.8,
+                reasons: [],
+                version: 'invented content canary',
+                automaticHide: false,
+              },
+            ],
+          })
+        )?.ok === true;
+    } catch {
+      /* rejected requests have no successful response */
+    }
+    const opened = indexedDB.open('slopzap', 2);
+    const connection = await new Promise<IDBDatabase>((resolve, reject) => {
+      opened.onsuccess = () => resolve(opened.result);
+      opened.onerror = () => reject();
+    });
+    try {
+      const stored = await new Promise<unknown>((resolve, reject) => {
+        const request = connection
+          .transaction('results')
+          .objectStore('results')
+          .get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject();
+      });
+      return { accepted, stored: stored !== undefined };
+    } finally {
+      connection.close();
+    }
+  });
+  expect(result).toEqual({ accepted: false, stored: false });
+});
+
 test('host scripts cannot spoof local feedback clicks', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const reply = page.locator('shreddit-comment[thingid="reply-1"]');
