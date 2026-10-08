@@ -1,10 +1,12 @@
 import { CLASSIFIER_VERSION } from '../src/shared/types';
+import { reproducibilityMatchesPackage } from './package-evidence';
 export function readiness(
   evidence: unknown,
   artifacts: {
     classification?: Record<string, unknown>;
     benchmark?: Record<string, unknown>;
     reproducibility?: Record<string, unknown>;
+    packagedFiles?: Record<string, string>;
   },
 ) {
   const object = (value: unknown): Record<string, unknown> =>
@@ -36,7 +38,10 @@ export function readiness(
       performance.allSpecBudgetsPassed === true &&
       artifacts.benchmark?.referenceHardwareAcceptance === true &&
       Number(artifacts.benchmark?.durationSeconds) >= 1800,
-    reproducibility: artifacts.reproducibility?.packagedFilesIdentical === true,
+    reproducibility: reproducibilityMatchesPackage(
+      artifacts.reproducibility,
+      artifacts.packagedFiles,
+    ),
     onDeviceVerification:
       reviews.onDeviceHardwareAndComparativeEvaluation === true,
     accessibility: reviews.accessibilityManualAudit === true,

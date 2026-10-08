@@ -26,7 +26,13 @@ test('experimental model reports and non-reference benchmarks do not qualify', (
         statisticalGatesPass: true,
       },
       benchmark: { durationSeconds: 1800, referenceHardwareAcceptance: false },
-      reproducibility: { packagedFilesIdentical: true },
+      reproducibility: {
+        schemaVersion: 1,
+        packagedFilesIdentical: true,
+        archiveByteEqualityClaimed: false,
+        files: { 'invented.js': 'a'.repeat(64) },
+      },
+      packagedFiles: { 'invented.js': 'a'.repeat(64) },
     },
   );
   expect(result.checks.classification).toBe(false);

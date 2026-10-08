@@ -1,34 +1,14 @@
-import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
-async function hashes(root) {
-  const values = {};
-  async function walk(path = '') {
-    for (const entry of await readdir(join(root, path), {
-      withFileTypes: true,
-    })) {
-      const relative = join(path, entry.name);
-      if (entry.isDirectory()) await walk(relative);
-      else
-        values[relative] = createHash('sha256')
-          .update(await readFile(join(root, relative)))
-          .digest('hex');
-    }
-  }
-  await walk();
-  return Object.fromEntries(
-    Object.entries(values).sort(([a], [b]) => a.localeCompare(b)),
-  );
-}
+import { packageFiles } from './package-files.mjs';
 const build = () => {
   const result = spawnSync('pnpm', ['build'], { stdio: 'inherit' });
   if (result.status !== 0) throw new Error('Reproducibility build failed');
 };
 build();
-const first = await hashes('.output/chrome-mv3');
+const first = await packageFiles('.output/chrome-mv3');
 build();
-const second = await hashes('.output/chrome-mv3');
+const second = await packageFiles('.output/chrome-mv3');
 if (JSON.stringify(first) !== JSON.stringify(second))
   throw new Error('Packaged file hashes differ across identical builds');
 await mkdir('.output/verification', { recursive: true });

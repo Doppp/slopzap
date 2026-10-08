@@ -1,13 +1,5 @@
 import { chromium } from '@playwright/test';
-import {
-  mkdtemp,
-  mkdir,
-  rm,
-  writeFile,
-  readdir,
-  readFile,
-} from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir, cpus, platform, arch, totalmem } from 'node:os';
 import { resolve, join } from 'node:path';
 import { benchmarkPlan } from './benchmark-plan.mjs';
@@ -16,39 +8,13 @@ import { installationEvidence } from './benchmark-installation.mjs';
 import { sampleWorkerHeap } from './worker-heap.mjs';
 import { fixtureSnapshot } from './benchmark-snapshot.mjs';
 import { sampleDetachedDom } from './detached-dom.mjs';
+import { packageFiles, packageFingerprint } from './package-files.mjs';
 const plan = benchmarkPlan(process.argv.slice(2));
 const { long, seconds, scenarios } = plan;
 const reportRoot = resolve('.output/benchmarks');
 await mkdir(reportRoot, { recursive: true });
 async function buildFingerprint() {
-  const hash = createHash('sha256');
-  let bytes = 0;
-  const visit = async (directory, prefix = '') => {
-    const entries = await readdir(directory, { withFileTypes: true });
-    for (const entry of entries.sort((a, b) =>
-      a.name.localeCompare(b.name, 'en'),
-    )) {
-      if (entry.isSymbolicLink())
-        throw new Error('Unexpected packaged symlink');
-      const path = join(directory, entry.name),
-        label = `${prefix}${entry.name}`;
-      if (entry.isDirectory()) await visit(path, `${label}/`);
-      else {
-        if (!entry.isFile()) throw new Error('Unexpected packaged resource');
-        const file = await readFile(path);
-        bytes += file.length;
-        if (bytes > 500_000) throw new Error('Unexpected packaged size');
-        hash.update(
-          JSON.stringify([
-            label,
-            createHash('sha256').update(file).digest('hex'),
-          ]) + '\n',
-        );
-      }
-    }
-  };
-  await visit(resolve('.output/chrome-mv3'));
-  return hash.digest('hex');
+  return packageFingerprint(await packageFiles(resolve('.output/chrome-mv3')));
 }
 const packagedBuildSha256 = await buildFingerprint();
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
