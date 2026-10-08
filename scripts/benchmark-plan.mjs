@@ -1,5 +1,5 @@
 export function benchmarkPlan(argv) {
-  const known = ['--long', '--paired-long', '--chrome'];
+  const known = ['--long', '--paired-long', '--chrome', '--with-absent'];
   if (
     argv.some(
       (value) =>
@@ -32,6 +32,15 @@ export function benchmarkPlan(argv) {
             [false, true].map((enabled) => ({ enabled, throttle, units })),
           ),
         );
+  const controls = scenarios.flatMap((scenario) => [
+    ...(argv.includes('--with-absent') && !scenario.enabled
+      ? [{ ...scenario, installed: false }]
+      : []),
+    { ...scenario, installed: true },
+  ]);
+  // The legacy single enabled run also gets its matching absent control.
+  if (argv.includes('--with-absent') && argv.includes('--long'))
+    controls.unshift({ ...scenarios[0], enabled: false, installed: false });
   return {
     long,
     seconds,
@@ -41,6 +50,6 @@ export function benchmarkPlan(argv) {
       : long
         ? 'single-long'
         : 'short',
-    scenarios,
+    scenarios: controls,
   };
 }
