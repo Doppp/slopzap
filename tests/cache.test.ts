@@ -24,8 +24,10 @@ test('cache stores derived results, exact corrections and rejects old classifier
   expect((await lookup([key])).results).toEqual([result]);
   await override(key, 'not_slop');
   expect((await lookup([key])).overrides[key]).toBe('not_slop');
-  await save([{ ...result, version: 'obsolete' }]);
-  expect((await lookup([key])).results).toEqual([]);
+  await expect(save([{ ...result, version: 'obsolete' }])).rejects.toThrow(
+    'Invalid cached result',
+  );
+  expect((await lookup([key])).results).toEqual([result]);
   await clear('overrides');
   expect((await lookup([key])).overrides).toEqual({});
 });
@@ -90,6 +92,12 @@ test('corrupt stored records fail open and are removed without refreshing unknow
   const now = Date.now();
   const records = [
     {
+      key: 'f'.repeat(64),
+      result: { ...result, fingerprint: 'f'.repeat(64), version: 'obsolete' },
+      accessed: now,
+      expires: now + 86400000,
+    },
+    {
       key: 'c'.repeat(64),
       result: { ...result, fingerprint: 'd'.repeat(64) },
       accessed: now,
@@ -136,7 +144,7 @@ test('corrupt stored records fail open and are removed without refreshing unknow
         }),
     ),
   );
-  expect(remaining).toEqual([undefined, undefined, undefined]);
+  expect(remaining).toEqual([undefined, undefined, undefined, undefined]);
   const override = await new Promise<unknown>((resolve) => {
     const request = connection
       .transaction('overrides')
