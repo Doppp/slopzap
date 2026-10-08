@@ -20,6 +20,7 @@ test('paired long plan has both processing controls at both renderer CPU rates',
     seconds: 1800,
     chrome: true,
     workerHeap: false,
+    detachedDom: false,
     mode: 'paired-long',
     scenarios: [
       { installed: true, enabled: false, throttle: 1, units: 1000 },
@@ -45,6 +46,19 @@ test('worker heap diagnostics are opt-in and do not change the scenario matrix',
   expect(plan.workerHeap).toBe(true);
   expect(plan.scenarios).toHaveLength(6);
   expect(() => benchmarkPlan(['--worker-heap', '--worker-heap'])).toThrow();
+});
+test('detached DOM diagnostics are opt-in, composable and retain paired controls', () => {
+  expect(benchmarkPlan([]).detachedDom).toBe(false);
+  const plan = benchmarkPlan([
+    '--paired-long',
+    '--with-absent',
+    '--detached-dom',
+    '--worker-heap',
+  ]);
+  expect(plan.detachedDom).toBe(true);
+  expect(plan.workerHeap).toBe(true);
+  expect(plan.scenarios).toHaveLength(6);
+  expect(() => benchmarkPlan(['--detached-dom', '--detached-dom'])).toThrow();
 });
 test('absent short controls match every size/rate without replacing disabled processing', () => {
   const plan = benchmarkPlan(['--with-absent', '--duration=1']);

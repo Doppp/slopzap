@@ -14,11 +14,11 @@ Use the packaged synthetic test feed from Settings to reproduce local scrolling 
 
 `pnpm benchmark --long --duration=1800` performs a 30-minute, 1,000-unit local virtualization diagnostic with periodic forced GC, CDP heap/DOM counters, full-interval frame statistics and binding counts. It reports the final heap relative to the first sample at or after ten minutes. This single enabled run is not a paired reference-machine acceptance. Run the full dedicated protocol in SPEC.md before approving release.
 
-Report schema v2 distinguishes all three controls. An absent scenario never loads the package or opens its Settings page; runtime counters remain `null`, not fabricated zeros. The runner requires an empty unpacked-extension registry and no injected annotations at both ends. Installed controls require the exact loaded package ID/path to remain enabled in Chrome, independently of the processing preference. [CDP's unpacked-extension list](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json) excludes built-in browser components; their aggregate target count may be nonzero and does not indicate SlopZap installation. IDs, names and paths are not exported.
+Report schema v3 distinguishes all three controls and adds optional detached-DOM samples. An absent scenario never loads the package or opens its Settings page; runtime counters remain `null`, not fabricated zeros. The runner requires an empty unpacked-extension registry and no injected annotations at both ends. Installed controls require the exact loaded package ID/path to remain enabled in Chrome, independently of the processing preference. [CDP's unpacked-extension list](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json) excludes built-in browser components; their aggregate target count may be nonzero and does not indicate SlopZap installation. IDs, names and paths are not exported.
 
 Frames use a fixed 40,004-byte histogram with 0.1 ms bins across the entire scripted-scroll observation interval, including benchmark GC/IPC work. Early slow frames no longer disappear after 1,200 samples. `p95Ms` is the bin's upper bound; lower/upper bounds are exported for comparisons. Frames at or above 1,000 ms enter an explicit overflow bucket; an overflowing p95 is `null`, not capped to a passing value. The over-33-ms ratio is a fixed-threshold jank proxy, not a measured dropped-frame rate, especially on high-refresh displays. Long-task observations include the fixture and harness, not just extension-attributed work. Playwright action traces are not Chrome performance traces.
 
-Installed scenarios create their own blank fixture tab through the trusted extension page and retain the returned tab ID in memory. Snapshot requests target that ID, not whichever tab happens to be active. The driver waits at most five additional seconds for the initial content listener; unavailable snapshots still fail checks. No tab-reading permission is added and no tab ID is exported.
+Installed scenarios create their own blank fixture tab through the trusted extension page and retain the returned tab ID in memory. Snapshot requests target that ID, not whichever tab happens to be active. The driver retries initial content-listener readiness up to fifty times with 100 ms spacing, plus message overhead; unavailable snapshots still fail checks. No tab-reading permission is added and no tab ID is exported.
 
 ### Worker heap diagnostics
 
@@ -33,6 +33,18 @@ Each sample discovers the current worker, attaches, invokes GC, reads [CDP JavaS
 Absent extensions produce `not_installed` with a null heap. Stopped workers produce `not_running` with a null heap; the probe does not deliberately wake them. Missing/invalid counters and command failures remain `unavailable`, and duplicate targets remain `ambiguous`. Unavailable/ambiguous states fail evidence-availability checks; later stopped-worker samples stay null rather than counting as measured coverage. Installed scenarios must begin with a valid measured sample. Attach/detach failure aborts the scenario and closes its disposable profile; GC/heap-command and detach waits have five-second deadlines.
 
 Debugger attachment and forced GC perturb lifecycle and timing, even though attachment lasts only for a sample. The report marks this explicitly. Keep unprobed frame/lifecycle runs separate from worker-heap diagnostics; CI runs both short controls. These counters do not measure worker CPU, process RAM, cold initialization, model cost, IndexedDB disk usage or detached DOM retention. Reference-hardware/resource approval remains a separate reviewed gate.
+
+### Detached DOM diagnostics
+
+Add `--detached-dom` to a separate invented-fixture diagnostic:
+
+```sh
+pnpm benchmark --paired-long --with-absent --detached-dom --chrome --duration=1
+```
+
+The probe forces GC and calls Chrome's experimental [DOM.getDetachedDomNodes command](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json) immediately before feed cleanup and again after removal and runtime cleanup. Each sample uses a fresh page debugger session, detached immediately to release inspector-side references. The export contains only detached-tree and unique retained-node counts. DOM text, attributes, IDs, trees and browser errors are not exported. Validation bounds projection work to 10,000 trees and 100,000 retained-ID entries; malformed or unavailable responses yield null counts and fail evidence-availability checks. Commands, attachment and detachment have five-second deadlines; attachment/detachment failure aborts the disposable scenario.
+
+These are renderer-wide counts, including fixture/browser retention, not attribution to SlopZap bindings or a heap retainer-path review. Probes occur outside frame observation but perturb memory with forced GC and inspector tracking. Zero counts in a short run do not establish thirty-minute or reference-machine acceptance; nonzero counts require investigation rather than automatic attribution. Keep unprobed controls separate. The positive/negative browser test deliberately retains a two-node invented tree, verifies its detection, releases it, and requires zero counts afterward. That test disables Playwright tracing because DOM snapshots introduced additional retained trees; benchmark action traces already disable snapshots. CI keeps an unprobed eighteen-scenario run and a separate six-scenario combined worker/DOM diagnostic.
 
 ## Reference machine handoff
 
