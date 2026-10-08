@@ -11,6 +11,8 @@ import { createHash } from 'node:crypto';
 import { tmpdir, cpus, platform, arch, totalmem } from 'node:os';
 import { resolve, join } from 'node:path';
 import { benchmarkPlan } from './benchmark-plan.mjs';
+import { installFrameProbe } from './benchmark-frames.mjs';
+import { installationEvidence } from './benchmark-installation.mjs';
 const plan = benchmarkPlan(process.argv.slice(2));
 const { long, seconds, scenarios } = plan;
 const reportRoot = resolve('.output/benchmarks');
@@ -68,50 +70,66 @@ for (const scenario of scenarios) {
             '--no-first-run',
             '--no-default-browser-check',
             '--mute-audio',
+            ...(!scenario.installed ? ['--disable-extensions'] : []),
             'about:blank',
           ]
-        : [
-            `--disable-extensions-except=${extension}`,
-            `--load-extension=${extension}`,
-            '--mute-audio',
-          ],
+        : scenario.installed
+          ? [
+              `--disable-extensions-except=${extension}`,
+              `--load-extension=${extension}`,
+              '--mute-audio',
+            ]
+          : ['--disable-extensions', '--mute-audio'],
     });
+    const browser = await context.browser().newBrowserCDPSession();
     let extensionId;
-    if (plan.chrome) {
-      const browser = await context.browser().newBrowserCDPSession();
+    if (scenario.installed && plan.chrome) {
       ({ id: extensionId } = await browser.send('Extensions.loadUnpacked', {
         path: extension,
       }));
-    } else {
+    } else if (scenario.installed) {
       const worker =
         context.serviceWorkers()[0] ??
         (await context.waitForEvent('serviceworker'));
       extensionId = new URL(worker.url()).host;
     }
-    const controller = await context.newPage();
-    await controller.goto(`chrome-extension://${extensionId}/options.html`);
-    await controller.evaluate(async (enabled) => {
-      const result = await chrome.runtime.sendMessage({
-        type: 'SETTINGS_SET',
-        settings: {
-          enabled,
-          debug: true,
-          onDevice: false,
-          mode: 'goggles',
-          blockerThreshold: 0.85,
-          onlyThreshold: 0.7,
-          sites: {
-            reddit: true,
-            youtube: true,
-            linkedin: true,
-            x: true,
-            medium: true,
+    const registration = () =>
+      browser
+        .send('Extensions.getExtensions')
+        .then((response) =>
+          installationEvidence(
+            response,
+            extensionId,
+            scenario.installed ? extension : undefined,
+          ),
+        );
+    const initialRegistration = await registration();
+    const controller = scenario.installed ? await context.newPage() : null;
+    if (controller) {
+      await controller.goto(`chrome-extension://${extensionId}/options.html`);
+      await controller.evaluate(async (enabled) => {
+        const result = await chrome.runtime.sendMessage({
+          type: 'SETTINGS_SET',
+          settings: {
+            enabled,
+            debug: true,
+            onDevice: false,
+            mode: 'goggles',
+            blockerThreshold: 0.85,
+            onlyThreshold: 0.7,
+            sites: {
+              reddit: true,
+              youtube: true,
+              linkedin: true,
+              x: true,
+              medium: true,
+            },
           },
-        },
-      });
-      if (!result || result.error || result.enabled !== enabled)
-        throw new Error('Benchmark settings unavailable');
-    }, scenario.enabled);
+        });
+        if (!result || result.error || result.enabled !== enabled)
+          throw new Error('Benchmark settings unavailable');
+      }, scenario.enabled);
+    }
     const page = await context.newPage();
     await page.route('https://www.reddit.com/**', (route) =>
       route.fulfill({
@@ -133,50 +151,41 @@ for (const scenario of scenarios) {
       'https://www.reddit.com/r/slopzap/comments/benchmark/invented/',
     );
     await page.bringToFront();
-    await page.evaluate(() => {
-      globalThis.benchmark = {
-        frames: [],
-        longTasks: 0,
-        longestTask: 0,
-        last: performance.now(),
-        running: true,
-      };
-      const data = globalThis.benchmark;
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          data.longTasks++;
-          data.longestTask = Math.max(data.longestTask, entry.duration);
-        }
-      }).observe({ type: 'longtask', buffered: false });
-      const frame = (now) => {
-        if (!data.running) return;
-        data.frames.push(now - data.last);
-        if (data.frames.length > 1200) data.frames.shift();
-        data.last = now;
-        requestAnimationFrame(frame);
-      };
-      requestAnimationFrame(frame);
-    });
     const snapshot = () =>
-      controller.evaluate(async () => {
-        for (const tab of await chrome.tabs.query({
-          active: true,
-          lastFocusedWindow: true,
-        }))
-          if (tab.id) {
-            try {
-              return await chrome.tabs.sendMessage(tab.id, {
-                type: 'SNAPSHOT',
-              });
-            } catch {
-              /* tab warming */
-            }
-          }
-        return null;
-      });
+      controller
+        ? controller.evaluate(async () => {
+            for (const tab of await chrome.tabs.query({
+              active: true,
+              lastFocusedWindow: true,
+            }))
+              if (tab.id) {
+                try {
+                  return await chrome.tabs.sendMessage(tab.id, {
+                    type: 'SNAPSHOT',
+                  });
+                } catch {
+                  /* tab warming */
+                }
+              }
+            return null;
+          })
+        : Promise.resolve(null);
+    const absentEvidence = async () => {
+      if (scenario.installed) return null;
+      const { targetInfos } = await browser.send('Target.getTargets');
+      return {
+        ...(await registration()),
+        extensionTargetCount: targetInfos.filter((target) =>
+          target.url.startsWith('chrome-extension://'),
+        ).length,
+        annotationCount: await page.locator('[data-slopzap-ui]').count(),
+      };
+    };
     await page.waitForTimeout(500);
     const initial = await snapshot();
+    const initialAbsent = await absentEvidence();
     const samples = [];
+    await page.evaluate(installFrameProbe);
     const started = Date.now();
     let nextSample = 0,
       round = 0;
@@ -210,28 +219,17 @@ for (const scenario of scenarios) {
             metrics.find((metric) => metric.name === 'JSHeapUsedSize')?.value ??
             null,
           domNodes: dom.nodes,
-          bound: state?.stats?.bound ?? 0,
-          candidates: state?.stats?.candidates ?? 0,
+          bound: state?.stats?.bound ?? null,
+          candidates: state?.stats?.candidates ?? null,
         });
         nextSample += long ? 60 : 2;
       }
       await page.waitForTimeout(250);
     }
     const final = await snapshot();
-    const frame = await page.evaluate(() => {
-      const data = globalThis.benchmark;
-      data.running = false;
-      const sorted = [...data.frames].sort((a, b) => a - b);
-      return {
-        samples: sorted.length,
-        p95Ms: sorted[Math.ceil(sorted.length * 0.95) - 1] ?? null,
-        over33msRatio: sorted.length
-          ? sorted.filter((value) => value > 33).length / sorted.length
-          : null,
-        longTasks: data.longTasks,
-        longestTaskMs: data.longestTask,
-      };
-    });
+    const frame = await page.evaluate(() => globalThis.benchmark.stop());
+    const finalRegistration = await registration();
+    const finalAbsent = await absentEvidence();
     // Include a post-run GC sample, not merely the last minute before 30:00.
     await cdp.send('HeapProfiler.collectGarbage');
     const finalMetrics = (await cdp.send('Performance.getMetrics')).metrics;
@@ -242,8 +240,8 @@ for (const scenario of scenarios) {
         finalMetrics.find((metric) => metric.name === 'JSHeapUsedSize')
           ?.value ?? null,
       domNodes: finalDom.nodes,
-      bound: final?.stats?.bound ?? 0,
-      candidates: final?.stats?.candidates ?? 0,
+      bound: final?.stats?.bound ?? null,
+      candidates: final?.stats?.candidates ?? null,
     });
     await page.evaluate(() => document.querySelector('main').replaceChildren());
     await page.waitForTimeout(300);
@@ -258,26 +256,57 @@ for (const scenario of scenarios) {
         ? last.heapBytes / atTenMinutes.heapBytes
         : null;
     const checks = {
-      boundedCandidates: samples.every((sample) => sample.candidates <= 1000),
-      cleanupBindings: (cleaned?.stats?.bound ?? 0) === 0,
-      cleanupCandidates: (cleaned?.stats?.candidates ?? 0) === 0,
-      viewportDriven:
-        !scenario.enabled ||
-        (initial?.stats?.classifications ?? scenario.units) < 40,
-      noClassificationWhenDisabled:
-        scenario.enabled || (final?.stats?.classifications ?? 0) === 0,
-      noHealthTrip: !final?.health?.code,
-      runtimeSnapshotsAvailable:
-        !!initial?.stats && !!final?.stats && !!cleaned?.stats,
+      framesObserved: frame.samples > 0,
+      ...(scenario.installed
+        ? {
+            packagedExtensionRegistered:
+              initialRegistration.unpackedExtensionCount === 1 &&
+              initialRegistration.packagedExtensionRegistered &&
+              finalRegistration.unpackedExtensionCount === 1 &&
+              finalRegistration.packagedExtensionRegistered,
+            boundedCandidates: samples.every(
+              (sample) =>
+                sample.candidates !== null && sample.candidates <= 1000,
+            ),
+            cleanupBindings: (cleaned?.stats?.bound ?? 0) === 0,
+            cleanupCandidates: (cleaned?.stats?.candidates ?? 0) === 0,
+            viewportDriven:
+              !scenario.enabled ||
+              (initial?.stats?.classifications ?? scenario.units) < 40,
+            noClassificationWhenDisabled:
+              scenario.enabled || (final?.stats?.classifications ?? 0) === 0,
+            noHealthTrip: !final?.health?.code,
+            runtimeSnapshotsAvailable:
+              !!initial?.stats && !!final?.stats && !!cleaned?.stats,
+          }
+        : {
+            noUnpackedExtensions:
+              initialAbsent?.unpackedExtensionCount === 0 &&
+              finalAbsent?.unpackedExtensionCount === 0,
+            noAnnotations:
+              initialAbsent?.annotationCount === 0 &&
+              finalAbsent?.annotationCount === 0,
+          }),
     };
     const result = {
       ...scenario,
       browserVersion: context.browser().version(),
-      control: 'same extension installed; enabled setting toggled',
+      control: scenario.installed
+        ? scenario.enabled
+          ? 'installed-processing-enabled'
+          : 'installed-processing-disabled'
+        : 'extension-absent',
       durationSeconds: (Date.now() - started) / 1000,
       initial: initial?.stats ?? null,
       final: final?.stats ?? null,
       timings: final?.timings ?? {},
+      absentEvidence: scenario.installed
+        ? null
+        : { initial: initialAbsent, final: finalAbsent },
+      installationEvidence: {
+        initial: initialRegistration,
+        final: finalRegistration,
+      },
       frames: frame,
       samples,
       plateauRatio,
@@ -305,7 +334,7 @@ await writeFile(
   path,
   JSON.stringify(
     {
-      schemaVersion: 1,
+      schemaVersion: 2,
       packagedBuildSha256,
       packagedBuildUnchanged: true,
       environment: {
@@ -322,6 +351,11 @@ await writeFile(
           ? 'installed headed Chrome'
           : 'bundled headless Chromium',
         throttleScope: 'page renderer only; not service-worker CPU',
+        includesExtensionAbsent: scenarios.some(
+          (scenario) => !scenario.installed,
+        ),
+        frameScope:
+          'full observation interval; fixed 0.1 ms histogram; over-33-ms ratio is a proxy, not measured dropped frames',
       },
       generatedAt: new Date().toISOString(),
       results,

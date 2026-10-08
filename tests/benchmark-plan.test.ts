@@ -21,18 +21,47 @@ test('paired long plan has both processing controls at both renderer CPU rates',
     chrome: true,
     mode: 'paired-long',
     scenarios: [
-      { enabled: false, throttle: 1, units: 1000 },
-      { enabled: true, throttle: 1, units: 1000 },
-      { enabled: false, throttle: 4, units: 1000 },
-      { enabled: true, throttle: 4, units: 1000 },
+      { installed: true, enabled: false, throttle: 1, units: 1000 },
+      { installed: true, enabled: true, throttle: 1, units: 1000 },
+      { installed: true, enabled: false, throttle: 4, units: 1000 },
+      { installed: true, enabled: true, throttle: 4, units: 1000 },
     ],
   });
 });
 test('legacy single long diagnostic remains explicit and can be smoked briefly', () => {
   expect(benchmarkPlan(['--long', '--duration=1']).scenarios).toEqual([
-    { enabled: true, throttle: 1, units: 1000 },
+    { installed: true, enabled: true, throttle: 1, units: 1000 },
   ]);
   expect(benchmarkPlan(['--paired-long', '--duration=1']).seconds).toBe(1);
+});
+test('absent short controls match every size/rate without replacing disabled processing', () => {
+  const plan = benchmarkPlan(['--with-absent', '--duration=1']);
+  expect(plan.scenarios).toHaveLength(18);
+  for (let index = 0; index < plan.scenarios.length; index += 3) {
+    const group = plan.scenarios.slice(index, index + 3);
+    expect(
+      group.map(({ installed, enabled }) => ({ installed, enabled })),
+    ).toEqual([
+      { installed: false, enabled: false },
+      { installed: true, enabled: false },
+      { installed: true, enabled: true },
+    ]);
+    expect(
+      new Set(group.map(({ units, throttle }) => `${units}/${throttle}`)).size,
+    ).toBe(1);
+  }
+});
+test('absent paired long controls cover both CPU rates and legacy long gets a pair', () => {
+  const plan = benchmarkPlan(['--paired-long', '--with-absent', '--chrome']);
+  expect(plan.scenarios).toHaveLength(6);
+  expect(plan.scenarios.filter((scenario) => !scenario.installed)).toEqual([
+    { installed: false, enabled: false, throttle: 1, units: 1000 },
+    { installed: false, enabled: false, throttle: 4, units: 1000 },
+  ]);
+  expect(benchmarkPlan(['--long', '--with-absent']).scenarios).toEqual([
+    { installed: false, enabled: false, throttle: 1, units: 1000 },
+    { installed: true, enabled: true, throttle: 1, units: 1000 },
+  ]);
 });
 test.each(
   [

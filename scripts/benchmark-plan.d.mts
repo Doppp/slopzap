@@ -1,4 +1,5 @@
 export interface BenchmarkScenario {
+  installed: boolean;
   enabled: boolean;
   throttle: number;
   units: number;
