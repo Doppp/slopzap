@@ -41,6 +41,7 @@ export class Runtime {
   private pausedRoute: string | undefined;
   private health = new AdapterHealth();
   private sampled = new WeakSet<HTMLElement>();
+  private sensitiveTransitions = new WeakSet<Element>();
   private metrics = new Metrics();
   private generation = 0;
   private worker: LocalClassifier | undefined;
@@ -216,6 +217,30 @@ export class Runtime {
           record.target.nodeType === Node.ELEMENT_NODE
             ? (record.target as Element)
             : record.target.parentElement;
+        const privacyAttribute =
+          record.type === 'attributes' &&
+          ['contenteditable', 'role', 'data-sz-private', 'class'].includes(
+            record.attributeName ?? '',
+          );
+        if (target && privacyAttribute) {
+          const sensitive = adapter.isSensitive(target);
+          const wasSensitive = this.sensitiveTransitions.has(target);
+          if (sensitive) this.sensitiveTransitions.add(target);
+          else this.sensitiveTransitions.delete(target);
+          if (
+            (sensitive || wasSensitive || record.attributeName !== 'class') &&
+            this.sweepTimer === undefined
+          )
+            this.sweepTimer = setTimeout(() => {
+              this.sweepTimer = undefined;
+              this.sweep();
+            }, 0);
+          if (!sensitive && (wasSensitive || record.attributeName !== 'class'))
+            this.dirty.push(target.closest(adapter.candidates) ?? target);
+          // Cosmetic class changes need no extraction or inference. A known
+          // sensitive-to-public transition is rediscovered in bounded slices.
+          if (record.attributeName === 'class' || sensitive) continue;
+        }
         if (target && adapter.isSensitive(target)) continue;
         if (
           [...record.removedNodes].some(
@@ -271,6 +296,10 @@ export class Runtime {
           'data-fullname',
           'id',
           'href',
+          'contenteditable',
+          'role',
+          'data-sz-private',
+          'class',
         ],
       });
       this.dirty.push(root);
@@ -427,11 +456,22 @@ export class Runtime {
           fingerprint: key,
           result: undefined,
           verdict: undefined,
-          renderer: new Renderer(binding, (verdict) => {
-            void this.feedback(node, verdict);
-          }),
+          renderer: new Renderer(
+            binding,
+            (verdict) => {
+              void this.feedback(node, verdict);
+            },
+            () =>
+              this.entries.get(node) === entry &&
+              entry.generation === this.generation &&
+              this.safeBinding(entry),
+          ),
           generation,
         };
+        if (!this.safeBinding(entry)) {
+          this.release(node);
+          continue;
+        }
         this.entries.set(node, entry);
         work.push(entry);
       }
@@ -469,7 +509,12 @@ export class Runtime {
         const inputs = [
           ...new Map(
             missing
-              .filter((entry) => !entry.result)
+              .filter(
+                (entry) =>
+                  !entry.result &&
+                  this.entries.get(entry.binding.container) === entry &&
+                  this.safeBinding(entry),
+              )
               .map((entry) => [entry.fingerprint, entry]),
           ).values(),
         ];
@@ -561,6 +606,7 @@ export class Runtime {
     const active = batch.filter(
       (entry) =>
         this.entries.get(entry.binding.container) === entry &&
+        this.safeBinding(entry) &&
         this.eligible.has(entry.binding.container) &&
         !entry.verdict,
     );
@@ -615,6 +661,10 @@ export class Runtime {
   private async feedback(node: HTMLElement, verdict: Verdict): Promise<void> {
     const entry = this.entries.get(node);
     if (!entry) return;
+    if (!this.safeBinding(entry)) {
+      this.release(node);
+      return;
+    }
     entry.verdict = verdict;
     entry.renderer.resetReveal();
     this.history.set(entry.fingerprint, this.scored(entry));
@@ -662,6 +712,10 @@ export class Runtime {
       const start = performance.now();
       while (index < entries.length && performance.now() - start < 5) {
         const entry = entries[index++]!;
+        if (!this.safeBinding(entry)) {
+          this.release(entry.binding.container);
+          continue;
+        }
         if (this.queue.has(entry.binding.container)) entry.renderer.cleanup();
         else if (
           entry.binding.container.isConnected &&
@@ -688,8 +742,38 @@ export class Runtime {
     );
   }
   private sweep(): void {
-    for (const node of this.candidates)
-      if (!node.isConnected) this.release(node);
+    for (const node of [...this.candidates]) {
+      const entry = this.entries.get(node);
+      const replaceBody =
+        !!entry &&
+        (!entry.binding.body.isConnected ||
+          !node.contains(entry.binding.body)) &&
+        this.safeCandidate(node);
+      if (!this.safeCandidate(node) || (entry && !this.safeBinding(entry))) {
+        this.release(node);
+        // Ordinary body replacement must remain observable. The new body is
+        // still parsed defensively; editors/private bodies never bind.
+        if (replaceBody) this.registerCandidate(node);
+      }
+    }
+  }
+  private safeCandidate(container: HTMLElement): boolean {
+    return (
+      !!this.adapter &&
+      container.isConnected &&
+      container.matches(this.adapter.candidates) &&
+      this.roots.some((root) => root.contains(container)) &&
+      !this.adapter.isSensitive(container)
+    );
+  }
+  private safeBinding(entry: Entry): boolean {
+    const { container, body } = entry.binding;
+    return (
+      this.safeCandidate(container) &&
+      body.isConnected &&
+      container.contains(body) &&
+      !this.adapter!.isSensitive(body)
+    );
   }
   private release(node: HTMLElement): void {
     this.candidates.delete(node);
@@ -744,6 +828,7 @@ export class Runtime {
     this.queue.clear();
     this.history.clear();
     this.dirty = [];
+    this.sensitiveTransitions = new WeakSet();
     this.busy = false;
   }
   stop = (): void => {

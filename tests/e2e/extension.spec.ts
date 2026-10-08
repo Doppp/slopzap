@@ -1063,6 +1063,110 @@ test('host scripts cannot spoof local feedback clicks', async () => {
   await expect(reply.locator('[slot="comment"]')).toBeVisible();
 });
 
+test('a previously hidden authored body is released when it becomes an editor', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  const body = reply.locator('[slot="comment"]');
+  await expect(body).toBeHidden();
+  const original = await body.textContent();
+  const before = (await snapshot()).stats.classifications;
+  await body.evaluate((node) => {
+    (node as HTMLElement).contentEditable = 'true';
+    node.textContent = 'Invented draft content must not be classified.';
+  });
+  await expect(body).toBeVisible();
+  await expect(reply.locator('[data-slopzap-ui]')).toHaveCount(0);
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(2);
+  expect((await snapshot()).stats.classifications).toBe(before);
+  await body.evaluate((node, original) => {
+    node.textContent = original;
+    (node as HTMLElement).contentEditable = 'false';
+  }, original);
+  await expect(body).toBeHidden();
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(3);
+});
+
+test('moving a bound item into a private subtree restores and releases it', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  const body = reply.locator('[slot="comment"]');
+  await expect(body).toBeHidden();
+  const before = (await snapshot()).stats.classifications;
+  await reply.evaluate((node) => {
+    const privateRoot = document.createElement('section');
+    privateRoot.dataset.szPrivate = 'true';
+    document.querySelector('main')!.append(privateRoot);
+    privateRoot.append(node);
+    node.querySelector('[slot="comment"]')!.textContent =
+      'Invented private content is excluded after reparenting.';
+  });
+  await expect(body).toBeVisible();
+  await expect(reply.locator('[data-slopzap-ui]')).toHaveCount(0);
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(2);
+  expect((await snapshot()).stats.classifications).toBe(before);
+});
+
+test('class-based messaging transitions remove existing bindings without inference', async () => {
+  const html = await readFile('fixtures/linkedin/thread.html', 'utf8');
+  await context.route('https://www.linkedin.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: html }),
+  );
+  await page.goto('https://www.linkedin.com/feed/');
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const before = (await snapshot()).stats.classifications;
+  await page
+    .locator('main')
+    .evaluate((node) => node.classList.add('msg-overlay-container'));
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(0);
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(0);
+  expect((await snapshot()).stats.classifications).toBe(before);
+  await page
+    .locator('main')
+    .evaluate((node) => node.classList.remove('msg-overlay-container'));
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+});
+
+test('trusted reveal action rechecks a target that becomes an editor during the click', async () => {
+  await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+  const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+  await reply
+    .getByRole('button', { name: 'SlopZap: Slop', exact: true })
+    .click();
+  await mode('Slop Blocker');
+  const body = reply.locator('[slot="comment"]');
+  await expect(body).toBeHidden();
+  const before = (await snapshot()).stats.classifications;
+  await page.evaluate(() =>
+    document.addEventListener(
+      'click',
+      () => {
+        const target = document.querySelector<HTMLElement>(
+          'shreddit-comment[thingid="reply-1"] [slot="comment"]',
+        )!;
+        target.contentEditable = 'true';
+        target.textContent =
+          'Invented draft introduced during a trusted control event.';
+      },
+      { capture: true, once: true },
+    ),
+  );
+  await reply
+    .getByRole('button', { name: 'SlopZap: Show', exact: true })
+    .click();
+  await expect(body).toBeVisible();
+  await expect(reply.locator('[data-slopzap-ui]')).toHaveCount(0);
+  await expect.poll(async () => (await snapshot()).stats.bound).toBe(2);
+  expect((await snapshot()).stats.classifications).toBe(before);
+});
+
 test('filtering never hides an inline editor inside an authored body', async () => {
   await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
   const reply = page.locator('shreddit-comment[thingid="reply-1"]');
