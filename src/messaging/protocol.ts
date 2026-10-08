@@ -1,5 +1,6 @@
 import {
   DEFAULT_SETTINGS,
+  validClassifierVersion,
   type Result,
   type Verdict,
   type Unit,
@@ -108,15 +109,15 @@ export function validResult(value: unknown): value is Result {
     r.evidence <= 1 &&
     Array.isArray(r.reasons) &&
     r.reasons.length <= 5 &&
-    r.reasons.every((reason) =>
+    Object.keys(r.reasons).length === r.reasons.length &&
+    Array.from(r.reasons).every((reason) =>
       [
         'Generic engagement',
         'Formulaic wording',
         'Repeats parent context',
       ].includes(reason),
     ) &&
-    typeof r.version === 'string' &&
-    r.version.length < 80 &&
+    validClassifierVersion(r.version) &&
     r.automaticHide === false
   );
 }
@@ -152,10 +153,7 @@ export function parseRequest(value: unknown): Request | null {
         : null;
     case 'CACHE_GET':
       return fields(value, ['type', 'keys', 'version']) &&
-        (r.version === undefined ||
-          (typeof r.version === 'string' &&
-            r.version.length > 0 &&
-            r.version.length < 80)) &&
+        (r.version === undefined || validClassifierVersion(r.version)) &&
         Array.isArray(r.keys) &&
         r.keys.length <= 50 &&
         Array.from(r.keys).every(keyValid)

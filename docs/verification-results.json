@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 77, "chromium": 38 },
+  "automatedTests": { "unit": 83, "chromium": 43 },
   "pairedComparison": {
     "inventedCases": 12,
     "alternatingArmOrder": true,
@@ -57,6 +57,9 @@
   "messageAndCacheHardening": {
     "malformedMessageRegressionsPassed": true,
     "corruptCacheRegressionsPassed": true,
+    "knownClassifierVersionRegressionsPassed": true,
+    "primitiveDiagnosticsRegressionsPassed": true,
+    "privacyTransitionRegressionsPassed": true,
     "permissionsAdded": false,
     "manualSecuritySignoff": false
   },
@@ -65,9 +68,19 @@
     "files": 28,
     "zipByteEqualityClaimed": false
   },
+  "targetedSecurityReview": {
+    "sourceReport": "docs/security-review-2026-10-08.md",
+    "scope": "implementation-agent boundary review; not independent signoff",
+    "productionAuditKnownVulnerabilities": 0,
+    "fullAuditKnownVulnerabilities": 0,
+    "ciActionsPinnedToVerifiedUpstreamCommits": true,
+    "checkoutPersistCredentials": false,
+    "actionManifestsUseNode24": true,
+    "manualSecuritySignoff": false
+  },
   "shortBenchmark": {
-    "scope": "paired-comparison development build; short regression checks, not reference-hardware acceptance",
-    "sourceReport": "2026-10-07T17-39-53-424Z.json",
+    "scope": "security/privacy development build; short regression checks, not reference-hardware acceptance",
+    "sourceReport": "2026-10-08T01-44-51-863Z.json",
     "scenarios": 12,
     "units": [100, 500, 1000],
     "cpuRates": [1, 4],

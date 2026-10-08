@@ -10,6 +10,7 @@ export class Renderer {
   constructor(
     private binding: Binding,
     private feedback: (verdict: Verdict) => void,
+    private safe: () => boolean = () => true,
   ) {
     this.originalHidden = binding.body.hidden;
   }
@@ -25,7 +26,13 @@ export class Renderer {
     if (this.hidden) this.binding.body.hidden = this.originalHidden;
     else this.originalHidden = this.binding.body.hidden;
     this.hidden = false;
-    if (mode === 'normal' || !result || this.binding.body.hidden) return;
+    if (
+      mode === 'normal' ||
+      !result ||
+      !this.safe() ||
+      this.binding.body.hidden
+    )
+      return;
     // Hiding a body containing descendants would orphan the branch. Annotate instead.
     if (
       this.binding.body.querySelector(

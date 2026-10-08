@@ -7,6 +7,7 @@ import {
 } from '../src/messaging/protocol';
 import { classify } from '../src/classifier/local';
 import { DEFAULT_SETTINGS } from '../src/shared/types';
+import { PROVIDER_VERSION } from '../src/providers/compose';
 const unit = {
   platform: 'reddit' as const,
   kind: 'reply' as const,
@@ -27,6 +28,40 @@ test('cache boundaries cannot authorize automatic hiding in the alpha', () => {
       results: [{ ...result, automaticHide: true }],
     }),
   ).toBeNull();
+});
+test('cache versions are known constants, never arbitrary retained strings', () => {
+  const result = classify(unit, 'a'.repeat(64));
+  expect(validResult({ ...result, version: PROVIDER_VERSION })).toBe(true);
+  expect(
+    parseRequest({ type: 'CACHE_GET', keys: [], version: PROVIDER_VERSION }),
+  ).not.toBeNull();
+  for (const version of [
+    '',
+    'obsolete',
+    'invented content canary',
+    `${PROVIDER_VERSION}-suffix`,
+  ]) {
+    expect(validResult({ ...result, version })).toBe(false);
+    expect(
+      parseRequest({ type: 'CACHE_SAVE', results: [{ ...result, version }] }),
+    ).toBeNull();
+    expect(parseRequest({ type: 'CACHE_GET', keys: [], version })).toBeNull();
+  }
+});
+test('cached reason arrays reject holes and undeclared retained fields', () => {
+  const result = classify(unit, 'a'.repeat(64));
+  const reasons = Object.assign(['Generic engagement'], {
+    rawText: 'invented canary',
+  });
+  for (const value of [new Array(1), reasons]) {
+    expect(validResult({ ...result, reasons: value })).toBe(false);
+    expect(
+      parseRequest({
+        type: 'CACHE_SAVE',
+        results: [{ ...result, reasons: value }],
+      }),
+    ).toBeNull();
+  }
 });
 test('content control messages reject null, unknown and oversized envelopes', () => {
   for (const value of [

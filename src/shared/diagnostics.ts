@@ -2,7 +2,9 @@ import { METRICS } from '../content/metrics';
 import { parseSettings } from './types';
 
 const object = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 const count = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.min(value, 1e9)
@@ -20,7 +22,7 @@ export function diagnostics(value: unknown) {
       'x',
       'medium',
       'synthetic',
-    ].includes(String(input.platform))
+    ].includes(typeof input.platform === 'string' ? input.platform : '')
       ? input.platform
       : 'unknown',
     settings: parseSettings(input.settings),
@@ -34,7 +36,7 @@ export function diagnostics(value: unknown) {
         'adapter_parse_failures',
         'adapter_parse_exception',
         'classifier_unavailable',
-      ].includes(String(health.code))
+      ].includes(typeof health.code === 'string' ? health.code : '')
         ? health.code
         : null,
       sampled: count(health.sampled),

@@ -1,6 +1,6 @@
-import { CLASSIFIER_VERSION, type Result } from '../shared/types';
+import { CHROME_PROMPT_VERSION, type Result } from '../shared/types';
 import type { ProviderResult } from './types';
-export const PROVIDER_VERSION = `${CLASSIFIER_VERSION}:chrome-prompt-v4`;
+export const PROVIDER_VERSION = CHROME_PROMPT_VERSION;
 export function compose(local: Result, model: ProviderResult): Result {
   const difference = Math.abs(local.score - model.score);
   const weight = model.evidence >= 0.8 ? 0.7 : 0.55;

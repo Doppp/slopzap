@@ -53,6 +53,10 @@ export interface Snapshot {
 }
 export type Verdict = 'not_slop' | 'slop';
 export const CLASSIFIER_VERSION = 'provisional-features-v4:reference-guide-v1';
+export const CHROME_PROMPT_VERSION = `${CLASSIFIER_VERSION}:chrome-prompt-v4`;
+export function validClassifierVersion(value: unknown): value is string {
+  return value === CLASSIFIER_VERSION || value === CHROME_PROMPT_VERSION;
+}
 export function parseSettings(value: unknown): Settings {
   const input =
     value && typeof value === 'object' ? (value as Partial<Settings>) : {};
