@@ -706,6 +706,7 @@ test('ordinary optional model analysis omits experimental reference guidance', a
 
 test('paired comparison exports only numeric results and leaves preferences unchanged', async () => {
   const comparison = await context.newPage();
+  await comparison.setViewportSize({ width: 320, height: 800 });
   await comparison.addInitScript(() => {
     const counters = { creates: 0, destroys: 0, prompts: 0, guided: 0 };
     Object.assign(globalThis, { comparisonCounters: counters });
@@ -794,6 +795,12 @@ test('paired comparison exports only numeric results and leaves preferences unch
   expect(JSON.stringify(report)).not.toMatch(
     /parentText|quotedText|bicycle|opening time|referenceGuide|fingerprint|https:\/\//,
   );
+  expect(
+    await comparison.evaluate(() => document.documentElement.scrollWidth),
+  ).toBe(320);
+  await expect(
+    comparison.getByRole('region', { name: 'Per example outcomes' }),
+  ).toBeVisible();
   expect(
     (await new AxeBuilder({ page: comparison }).analyze()).violations,
   ).toEqual([]);
@@ -939,6 +946,149 @@ test('mode changes preserve content collapsed by the host website', async () => 
   await mode('Slop Goggles');
   await expect(body).toBeHidden();
 });
+
+for (const theme of [
+  { name: 'light', color: '#15191b', background: '#ffffff' },
+  { name: 'dark', color: '#f2f0e9', background: '#15191b' },
+]) {
+  test(`injected controls retain accessible names and host keyboard behavior on a ${theme.name} background`, async () => {
+    await expect(page.locator('[data-slopzap-ui]')).toHaveCount(3);
+    const before = (await snapshot()).stats.classifications;
+    await page.evaluate((theme) => {
+      document.body.style.color = theme.color;
+      document.body.style.background = theme.background;
+      const events: boolean[] = [];
+      Object.assign(globalThis, { hostShortcutEvents: events });
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'j') events.push(event.defaultPrevented);
+      });
+    }, theme);
+    const reply = page.locator('shreddit-comment[thingid="reply-1"]');
+    const notSlop = reply.getByRole('button', {
+      name: 'SlopZap: Not slop',
+      exact: true,
+    });
+    const slop = reply.getByRole('button', {
+      name: 'SlopZap: Slop',
+      exact: true,
+    });
+    await notSlop.focus();
+    await page.keyboard.press('j');
+    await page.keyboard.press('Tab');
+    await expect(slop).toBeFocused();
+    await page.keyboard.press('j');
+    await page.keyboard.press('Tab');
+    await expect(
+      page.getByRole('textbox', { name: 'Invented draft editor' }),
+    ).toBeFocused();
+    expect(
+      await page.evaluate(
+        () =>
+          (globalThis as unknown as { hostShortcutEvents: boolean[] })
+            .hostShortcutEvents,
+      ),
+    ).toEqual([false, false]);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await snapshot()).stats.classifications).toBe(before);
+    await page.screenshot({
+      path: `test-results/injected-${theme.name}.png`,
+      fullPage: true,
+    });
+  });
+}
+
+async function auditLayout(view: Page, width: number, surface: string) {
+  const check = async () => {
+    await expect
+      .poll(() =>
+        view.evaluate(() => ({
+          width: document.documentElement.clientWidth,
+          content: document.documentElement.scrollWidth,
+        })),
+      )
+      .toEqual({ width, content: width });
+    expect((await new AxeBuilder({ page: view }).analyze()).violations).toEqual(
+      [],
+    );
+  };
+  await check();
+  if (surface === 'onboarding') {
+    for (const [name, heading] of [
+      ['Let’s set it up', 'How do you want to browse?'],
+      ['Choose sites', 'Choose where SlopZap runs'],
+      ['Save setup', 'You’re ready to zap.'],
+    ] as const) {
+      await view.getByRole('button', { name, exact: true }).click();
+      await expect(
+        view.getByRole('heading', { name: heading, exact: true }),
+      ).toBeVisible();
+      await check();
+    }
+    await expect(
+      view.getByRole('heading', { name: 'You’re ready to zap.' }),
+    ).toBeVisible();
+  } else if (surface === 'comparison') {
+    await view
+      .getByText('Review the 12 invented examples', { exact: true })
+      .click();
+    await check();
+  }
+}
+
+for (const surface of ['popup', 'options', 'onboarding', 'comparison']) {
+  test(`${surface} reflows at a 320 CSS-pixel viewport without horizontal page scrolling`, async () => {
+    const view = await context.newPage();
+    await view.setViewportSize({ width: 320, height: 800 });
+    await view.goto(`chrome-extension://${extensionId}/${surface}.html`);
+    await expect(view.getByRole('heading', { level: 1 })).toBeVisible();
+    await auditLayout(view, 320, surface);
+    await view.close();
+  });
+
+  test(`${surface} remains usable at native 200% and 400% browser zoom`, async () => {
+    const view = await context.newPage();
+    await view.setViewportSize({ width: 1280, height: 900 });
+    await view.goto(`chrome-extension://${extensionId}/${surface}.html`);
+    const originalRatio = await view.evaluate(() => devicePixelRatio);
+    for (const factor of [2, 4]) {
+      if (factor === 4) await view.reload();
+      const zoom = await view.evaluate(async (factor) => {
+        const chrome = (
+          globalThis as unknown as {
+            chrome: {
+              tabs: {
+                getCurrent(): Promise<{ id?: number }>;
+                setZoomSettings(id: number, settings: object): Promise<void>;
+                setZoom(id: number, factor: number): Promise<void>;
+                getZoom(id: number): Promise<number>;
+              };
+            };
+          }
+        ).chrome;
+        const tab = await chrome.tabs.getCurrent();
+        if (tab.id === undefined) throw new Error('Test tab unavailable');
+        await chrome.tabs.setZoomSettings(tab.id, {
+          mode: 'automatic',
+          scope: 'per-tab',
+        });
+        await chrome.tabs.setZoom(tab.id, factor);
+        return chrome.tabs.getZoom(tab.id);
+      }, factor);
+      expect(zoom).toBeCloseTo(factor, 6);
+      await expect
+        .poll(() =>
+          view.evaluate((ratio) => devicePixelRatio / ratio, originalRatio),
+        )
+        .toBeCloseTo(factor, 6);
+      await auditLayout(view, 1280 / factor, surface);
+      await view.screenshot({
+        path: `test-results/${surface}-zoom-${factor}.png`,
+        fullPage: false,
+      });
+    }
+    await view.close();
+  });
+}
 
 test('malformed runtime messages leave preferences and content processing intact', async () => {
   const options = await context.newPage();
