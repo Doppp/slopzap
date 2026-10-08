@@ -1,55 +1,26 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
+import {
+  assertManifestPolicy,
+  PACKAGED_ENTRYPOINTS,
+} from './manifest-policy.mjs';
 const root = '.output/chrome-mv3';
+if (!(await lstat(join(root, 'manifest.json'))).isFile())
+  throw new Error('Unexpected packaged manifest');
 const manifest = JSON.parse(
   await readFile(join(root, 'manifest.json'), 'utf8'),
 );
-if (
-  manifest.manifest_version !== 3 ||
-  manifest.permissions.some((p) => !['storage'].includes(p))
-)
-  throw new Error('Unexpected extension permissions');
-if (JSON.stringify(manifest).includes('<all_urls>'))
-  throw new Error('Broad host permission');
-if (
-  manifest.optional_permissions?.length ||
-  manifest.optional_host_permissions?.length ||
-  manifest.externally_connectable
-)
-  throw new Error('Unexpected optional/external access');
-if (
-  manifest.content_security_policy?.extension_pages !==
-  "script-src 'self'; object-src 'none';"
-)
-  throw new Error('Unexpected extension CSP');
-const allowed = new Set([
-  'https://www.reddit.com/*',
-  'https://www.youtube.com/*',
-  'https://www.linkedin.com/*',
-  'https://x.com/*',
-  'https://twitter.com/*',
-  'https://medium.com/*',
-]);
-for (const script of manifest.content_scripts ?? []) {
-  if (
-    script.matches.some((match) => !allowed.has(match)) ||
-    script.all_frames ||
-    script.match_about_blank ||
-    script.match_origin_as_fallback ||
-    (script.world && script.world !== 'ISOLATED')
-  )
-    throw new Error('Unexpected content-script access');
+assertManifestPolicy(manifest);
+for (const entry of PACKAGED_ENTRYPOINTS) {
+  const file = await lstat(join(root, entry)).catch(() => null);
+  if (!file?.isFile()) throw new Error(`Missing packaged entrypoint: ${entry}`);
 }
-if (
-  manifest.host_permissions?.length ||
-  manifest.web_accessible_resources?.length
-)
-  throw new Error('Unexpected privileged network or page-accessible resources');
 async function size(dir) {
   let bytes = 0;
   for (const name of await readdir(dir)) {
     const path = join(dir, name);
-    const info = await stat(path);
+    const info = await lstat(path);
+    if (info.isSymbolicLink()) throw new Error('Unexpected packaged symlink');
     bytes += info.isDirectory() ? await size(path) : info.size;
   }
   return bytes;
