@@ -1,3 +1,5 @@
+import { validateProbeDeadline } from './cdp-target.mjs';
+
 const unavailable = () => ({ status: 'unavailable', counts: null });
 
 // Never export node IDs, names, attributes, text, trees or protocol errors.
@@ -43,6 +45,7 @@ async function bounded(operation, deadlineMs) {
 }
 
 export async function sampleDetachedDom(context, page, deadlineMs = 5000) {
+  validateProbeDeadline(deadlineMs);
   let session;
   try {
     session = await bounded(context.newCDPSession(page), deadlineMs);
