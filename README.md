@@ -35,7 +35,7 @@ If repeated parsing failures or a parser exception indicate incompatible markup,
 
 ## Privacy and classification
 
-Local analysis is the default. No accounts, API keys, backend, telemetry, inference network requests, browsing-history collection, or full-page uploads. The optional Chrome Prompt API uses a browser-managed on-device model; enabling it may download a large model, and availability depends on hardware/browser support. It is tested through provider mocks; model quality on real hardware is not yet validated.
+Local analysis is the default. No accounts, API keys, backend, telemetry, inference network requests, browsing-history collection, or full-page uploads. The optional Chrome Prompt API uses a browser-managed on-device model; enabling it may download a large model, and availability depends on hardware/browser support. Automated tests use provider mocks. Three small real-model comparison runs were incomplete and did not establish accuracy or a reference-guide benefit; ordinary analysis omits that experimental guide. See [model comparison](docs/model-comparison.md).
 
 Private messaging routes, forms, compose fields, and group routes are excluded. Raw target/context text exists only in active runtime memory. IndexedDB stores derived scores and local exact-item corrections, with expiry and bounded eviction. Corrections are never uploaded. See [PRIVACY.md](PRIVACY.md).
 
@@ -50,7 +50,7 @@ pnpm format:check
 pnpm exec playwright install chromium
 pnpm test:e2e                # real Chromium + unpacked production extension
 pnpm eval                    # seed evaluation metrics; no accuracy claim
-node scripts/live-smoke.mjs   # optional public signed-out smoke; never a CI prerequisite
+pnpm live:smoke              # optional isolated-Chrome public smoke; never release approval
 pnpm benchmark --duration=5   # synthetic controls at 1x/4x CPU
 pnpm reproducibility         # compare two packaged builds
 pnpm release:check           # fails until reviewed release evidence passes
