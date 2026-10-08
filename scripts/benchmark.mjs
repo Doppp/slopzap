@@ -1,50 +1,98 @@
 import { chromium } from '@playwright/test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir, cpus, platform, arch } from 'node:os';
+import {
+  mkdtemp,
+  mkdir,
+  rm,
+  writeFile,
+  readdir,
+  readFile,
+} from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { tmpdir, cpus, platform, arch, totalmem } from 'node:os';
 import { resolve, join } from 'node:path';
-const long = process.argv.includes('--long');
-const seconds = Number(
-  process.argv
-    .find((value) => value.startsWith('--duration='))
-    ?.split('=')[1] ?? (long ? 1800 : 5),
-);
-if (!Number.isFinite(seconds) || seconds < 1 || seconds > 3600)
-  throw new Error('Duration must be 1–3600 seconds');
+import { benchmarkPlan } from './benchmark-plan.mjs';
+const plan = benchmarkPlan(process.argv.slice(2));
+const { long, seconds, scenarios } = plan;
 const reportRoot = resolve('.output/benchmarks');
 await mkdir(reportRoot, { recursive: true });
+async function buildFingerprint() {
+  const hash = createHash('sha256');
+  let bytes = 0;
+  const visit = async (directory, prefix = '') => {
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries.sort((a, b) =>
+      a.name.localeCompare(b.name, 'en'),
+    )) {
+      if (entry.isSymbolicLink())
+        throw new Error('Unexpected packaged symlink');
+      const path = join(directory, entry.name),
+        label = `${prefix}${entry.name}`;
+      if (entry.isDirectory()) await visit(path, `${label}/`);
+      else {
+        if (!entry.isFile()) throw new Error('Unexpected packaged resource');
+        const file = await readFile(path);
+        bytes += file.length;
+        if (bytes > 500_000) throw new Error('Unexpected packaged size');
+        hash.update(
+          JSON.stringify([
+            label,
+            createHash('sha256').update(file).digest('hex'),
+          ]) + '\n',
+        );
+      }
+    }
+  };
+  await visit(resolve('.output/chrome-mv3'));
+  return hash.digest('hex');
+}
+const packagedBuildSha256 = await buildFingerprint();
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-const scenarios = long
-  ? [{ enabled: true, throttle: 1, units: 1000 }]
-  : [1, 4].flatMap((throttle) =>
-      [100, 500, 1000].flatMap((units) =>
-        [false, true].map((enabled) => ({ enabled, throttle, units })),
-      ),
-    );
 const results = [];
 for (const scenario of scenarios) {
+  if ((await buildFingerprint()) !== packagedBuildSha256)
+    throw new Error('Packaged build changed during benchmark');
   const profile = await mkdtemp(join(tmpdir(), 'slopzap-benchmark-'));
   let context;
   try {
     const extension = resolve('.output/chrome-mv3');
     context = await chromium.launchPersistentContext(profile, {
-      channel: 'chromium',
-      headless: true,
+      channel: plan.chrome ? 'chrome' : 'chromium',
+      headless: !plan.chrome,
+      ...(plan.chrome ? { ignoreDefaultArgs: true } : {}),
       viewport: { width: 1200, height: 800 },
-      args: [
-        `--disable-extensions-except=${extension}`,
-        `--load-extension=${extension}`,
-        '--mute-audio',
-      ],
+      args: plan.chrome
+        ? [
+            `--user-data-dir=${profile}`,
+            '--remote-debugging-pipe',
+            '--enable-unsafe-extension-debugging',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--mute-audio',
+            'about:blank',
+          ]
+        : [
+            `--disable-extensions-except=${extension}`,
+            `--load-extension=${extension}`,
+            '--mute-audio',
+          ],
     });
-    const worker =
-      context.serviceWorkers()[0] ??
-      (await context.waitForEvent('serviceworker'));
+    let extensionId;
+    if (plan.chrome) {
+      const browser = await context.browser().newBrowserCDPSession();
+      ({ id: extensionId } = await browser.send('Extensions.loadUnpacked', {
+        path: extension,
+      }));
+    } else {
+      const worker =
+        context.serviceWorkers()[0] ??
+        (await context.waitForEvent('serviceworker'));
+      extensionId = new URL(worker.url()).host;
+    }
     const controller = await context.newPage();
-    await controller.goto(
-      `chrome-extension://${new URL(worker.url()).host}/options.html`,
-    );
-    await worker.evaluate(async (enabled) => {
-      await chrome.storage.local.set({
+    await controller.goto(`chrome-extension://${extensionId}/options.html`);
+    await controller.evaluate(async (enabled) => {
+      const result = await chrome.runtime.sendMessage({
+        type: 'SETTINGS_SET',
         settings: {
           enabled,
           debug: true,
@@ -61,6 +109,8 @@ for (const scenario of scenarios) {
           },
         },
       });
+      if (!result || result.error || result.enabled !== enabled)
+        throw new Error('Benchmark settings unavailable');
     }, scenario.enabled);
     const page = await context.newPage();
     await page.route('https://www.reddit.com/**', (route) =>
@@ -182,6 +232,19 @@ for (const scenario of scenarios) {
         longestTaskMs: data.longestTask,
       };
     });
+    // Include a post-run GC sample, not merely the last minute before 30:00.
+    await cdp.send('HeapProfiler.collectGarbage');
+    const finalMetrics = (await cdp.send('Performance.getMetrics')).metrics;
+    const finalDom = await cdp.send('Memory.getDOMCounters');
+    samples.push({
+      elapsedSeconds: Math.round((Date.now() - started) / 1000),
+      heapBytes:
+        finalMetrics.find((metric) => metric.name === 'JSHeapUsedSize')
+          ?.value ?? null,
+      domNodes: finalDom.nodes,
+      bound: final?.stats?.bound ?? 0,
+      candidates: final?.stats?.candidates ?? 0,
+    });
     await page.evaluate(() => document.querySelector('main').replaceChildren());
     await page.waitForTimeout(300);
     const cleaned = await snapshot();
@@ -204,9 +267,12 @@ for (const scenario of scenarios) {
       noClassificationWhenDisabled:
         scenario.enabled || (final?.stats?.classifications ?? 0) === 0,
       noHealthTrip: !final?.health?.code,
+      runtimeSnapshotsAvailable:
+        !!initial?.stats && !!final?.stats && !!cleaned?.stats,
     };
     const result = {
       ...scenario,
+      browserVersion: context.browser().version(),
       control: 'same extension installed; enabled setting toggled',
       durationSeconds: (Date.now() - started) / 1000,
       initial: initial?.stats ?? null,
@@ -225,17 +291,38 @@ for (const scenario of scenarios) {
       JSON.stringify({ scenario, checks, frames: frame, plateauRatio }),
     );
   } finally {
-    await context?.close();
-    await rm(profile, { recursive: true, force: true });
+    try {
+      await context?.close();
+    } finally {
+      await rm(profile, { recursive: true, force: true });
+    }
   }
 }
 const path = join(reportRoot, `${stamp}.json`);
+if ((await buildFingerprint()) !== packagedBuildSha256)
+  throw new Error('Packaged build changed during benchmark');
 await writeFile(
   path,
   JSON.stringify(
     {
       schemaVersion: 1,
-      environment: { os: platform(), arch: arch(), cpuCount: cpus().length },
+      packagedBuildSha256,
+      packagedBuildUnchanged: true,
+      environment: {
+        os: platform(),
+        arch: arch(),
+        cpuCount: cpus().length,
+        cpuModel: cpus()[0]?.model ?? 'unknown',
+        memoryBytes: totalmem(),
+      },
+      plan: {
+        mode: plan.mode,
+        secondsPerScenario: seconds,
+        browser: plan.chrome
+          ? 'installed headed Chrome'
+          : 'bundled headless Chromium',
+        throttleScope: 'page renderer only; not service-worker CPU',
+      },
       generatedAt: new Date().toISOString(),
       results,
     },
