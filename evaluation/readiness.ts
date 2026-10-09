@@ -1,4 +1,4 @@
-import { CLASSIFIER_VERSION } from '../src/shared/types';
+import { classificationMatchesPackage } from './classification-evidence';
 import { reproducibilityMatchesPackage } from './package-evidence';
 import { performanceMatchesPackage } from './performance-evidence';
 export function readiness(
@@ -23,8 +23,10 @@ export function readiness(
     schema: source.schemaVersion === 1,
     classification:
       classification.independentReviewApproved === true &&
-      artifacts.classification?.statisticalGatesPass === true &&
-      artifacts.classification?.classifierVersion === CLASSIFIER_VERSION,
+      classificationMatchesPackage(
+        artifacts.classification,
+        artifacts.packagedFiles,
+      ),
     livePlatforms: ['reddit', 'youtube', 'linkedin', 'x', 'medium'].every(
       (site) =>
         object(live[site]).passed === true &&

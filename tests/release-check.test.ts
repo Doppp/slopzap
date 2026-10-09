@@ -5,9 +5,71 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { inventedPerformanceReport } from './fixtures/performance-evidence';
+import { inventedClassificationReport } from './fixtures/classification-evidence';
 
 const cli = resolve('node_modules/tsx/dist/cli.mjs'),
   script = resolve('scripts/release-check.ts');
+
+test.each(['reviewed', 'stale', 'flag-only', 'bad-rate', 'experimental'])(
+  'release CLI checks classification aggregates and build: %s',
+  async (mode) => {
+    const root = await mkdtemp(
+      join(tmpdir(), 'slopzap-classification-check-test-'),
+    );
+    try {
+      await mkdir(join(root, '.output', 'chrome-mv3'), { recursive: true });
+      await mkdir(join(root, '.output', 'verification'));
+      await mkdir(join(root, 'docs'));
+      const content = 'invented-classification-canary-not-to-export';
+      await writeFile(
+        join(root, '.output', 'chrome-mv3', 'invented.js'),
+        content,
+      );
+      const wrapper = inventedClassificationReport();
+      wrapper.files['invented.js'] = createHash('sha256')
+        .update(content)
+        .digest('hex');
+      if (mode === 'stale') wrapper.files['invented.js'] = 'b'.repeat(64);
+      if (mode === 'bad-rate') wrapper.evaluationReport.blocker.fpr = 0;
+      if (mode === 'experimental')
+        wrapper.evaluationReport.classifierVersion = 'experimental-logistic-v2';
+      await writeFile(
+        join(root, '.output', 'verification', 'classification.json'),
+        JSON.stringify(
+          mode === 'flag-only'
+            ? {
+                classifierVersion: wrapper.evaluationReport.classifierVersion,
+                statisticalGatesPass: true,
+              }
+            : wrapper,
+        ),
+      );
+      await writeFile(
+        join(root, 'docs', 'release-evidence.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          classification: {
+            report: '.output/verification/classification.json',
+            independentReviewApproved: true,
+          },
+        }),
+      );
+      const result = spawnSync(process.execPath, [cli, script], {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 10_000,
+      });
+      expect(result.status).toBe(1);
+      const output = JSON.parse(result.stdout);
+      expect(output.checks.classification).toBe(mode === 'reviewed');
+      expect(output.releaseReady).toBe(false);
+      expect(result.stdout).not.toContain(content);
+      expect(result.stdout).not.toContain(root);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 test.each(['matching', 'modified', 'missing', 'added', 'symlink'])(
   'release CLI rejects incompatible package evidence: %s',
   async (mode) => {
