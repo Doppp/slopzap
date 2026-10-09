@@ -810,6 +810,108 @@ test('paired comparison exports only numeric results and leaves preferences unch
   });
 });
 
+for (const phase of ['create', 'clone'] as const) {
+  test(`cancelled comparison releases late ${phase} sessions without starting inference`, async () => {
+    const comparison = await context.newPage();
+    await comparison.addInitScript((phase) => {
+      const counters = {
+        creates: 0,
+        clones: 0,
+        prompts: 0,
+        baseDestroys: 0,
+        cloneDestroys: 0,
+        createAborts: 0,
+      };
+      let release: (() => void) | undefined;
+      const child = {
+        destroy: () => counters.cloneDestroys++,
+        prompt: async () => {
+          counters.prompts++;
+          return '{}';
+        },
+      };
+      const base = {
+        destroy: () => counters.baseDestroys++,
+        clone: async () => {
+          counters.clones++;
+          return phase === 'clone'
+            ? new Promise((resolve) => {
+                release = () => resolve(child);
+              })
+            : child;
+        },
+      };
+      Object.assign(globalThis, {
+        lateModelCounters: counters,
+        releaseLateModel: () => release?.(),
+      });
+      Object.defineProperty(globalThis, 'LanguageModel', {
+        value: {
+          availability: async () => 'available',
+          create: async (options: { signal: AbortSignal }) => {
+            counters.creates++;
+            options.signal.addEventListener(
+              'abort',
+              () => counters.createAborts++,
+              { once: true },
+            );
+            return phase === 'create'
+              ? new Promise((resolve) => {
+                  release = () => resolve(base);
+                })
+              : base;
+          },
+        },
+      });
+    }, phase);
+    const counters = () =>
+      comparison.evaluate(
+        () =>
+          (
+            globalThis as unknown as {
+              lateModelCounters: {
+                creates: number;
+                clones: number;
+                prompts: number;
+                baseDestroys: number;
+                cloneDestroys: number;
+                createAborts: number;
+              };
+            }
+          ).lateModelCounters,
+      );
+    await comparison.goto(`chrome-extension://${extensionId}/comparison.html`);
+    await comparison
+      .getByRole('button', { name: 'Run paired comparison' })
+      .click();
+    await expect
+      .poll(async () =>
+        phase === 'create'
+          ? (await counters()).creates
+          : (await counters()).clones,
+      )
+      .toBe(1);
+    await comparison.getByRole('button', { name: 'Cancel comparison' }).click();
+    await expect(comparison.getByRole('status')).toContainText(
+      'Comparison cancelled · 0 of 12 valid pairs',
+    );
+    await expect.poll(async () => (await counters()).createAborts).toBe(1);
+    await comparison.evaluate(() =>
+      (
+        globalThis as unknown as { releaseLateModel(): void }
+      ).releaseLateModel(),
+    );
+    await expect.poll(async () => (await counters()).baseDestroys).toBe(1);
+    await expect
+      .poll(async () => (await counters()).cloneDestroys)
+      .toBe(phase === 'clone' ? 1 : 0);
+    expect(await counters()).toMatchObject({ creates: 1, prompts: 0 });
+    await expect(
+      comparison.getByRole('button', { name: 'Run paired comparison' }),
+    ).toBeEnabled();
+  });
+}
+
 test('cancelling a stuck comparison releases sessions and reports incomplete evidence', async () => {
   const comparison = await context.newPage();
   await comparison.addInitScript(() => {

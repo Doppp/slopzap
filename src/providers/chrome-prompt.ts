@@ -85,6 +85,8 @@ export async function downloadModel(
 export class ChromePromptProvider implements Provider {
   readonly id = 'chrome_prompt';
   private session: Promise<ModelSession> | undefined;
+  private sessionAbort: AbortController | undefined;
+  private busy = false;
   private disposed = false;
   private lifetime = new AbortController();
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -95,19 +97,35 @@ export class ChromePromptProvider implements Provider {
     private references = false,
   ) {}
   async ready(): Promise<boolean> {
-    return (
-      !this.disposed &&
-      !!this.api &&
-      (await this.api.availability(OPTIONS)) === 'available'
-    );
+    if (this.disposed || !this.api) return false;
+    const state = await this.api.availability(OPTIONS);
+    return !this.disposed && state === 'available';
   }
   async classify(
     inputs: ProviderInput[],
     signal: AbortSignal,
   ): Promise<ProviderResult[]> {
-    if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
-    if (!(await abortable(this.ready(), signal)) || inputs.length > 12)
-      return [];
+    if (this.disposed || this.busy) return [];
+    this.busy = true;
+    const combined = AbortSignal.any([signal, this.lifetime.signal]);
+    try {
+      combined.throwIfAborted();
+      return await this.classifyBatch(inputs, combined);
+    } catch (error) {
+      // Cancelled/failed sessions are never reusable. Late creation is still owned.
+      this.releaseBase();
+      throw error;
+    } finally {
+      this.busy = false;
+      if (!this.disposed && this.session && this.idleTimer === undefined)
+        this.idleTimer = setTimeout(() => this.releaseBase(), 60_000);
+    }
+  }
+  private async classifyBatch(
+    inputs: ProviderInput[],
+    signal: AbortSignal,
+  ): Promise<ProviderResult[]> {
+    if (!inputs.length || inputs.length > 12) return [];
     const eligible = inputs.filter(
       (input) =>
         input.unit.kind !== 'article' || input.unit.text.length >= 3600,
@@ -125,30 +143,46 @@ export class ChromePromptProvider implements Provider {
       (input) => articles.get(input.id) ?? [input],
     );
     if (expanded.length > 12) return [];
-    this.session ??= this.api!.create({
-      ...OPTIONS,
-      signal: this.lifetime.signal,
-      initialPrompts: [
-        {
-          role: 'system',
-          content: this.references ? INSTRUCTIONS : BASELINE_INSTRUCTIONS,
-        },
-      ],
-    }).catch((error) => {
-      this.session = undefined;
-      throw error;
-    });
-    const base = await abortable(this.session, signal);
+    if (!(await abortable(this.ready(), signal))) return [];
+    signal.throwIfAborted();
+    this.clearIdle();
+    if (!this.session) {
+      const owner = new AbortController();
+      this.sessionAbort = owner;
+      const pending = this.api!.create({
+        ...OPTIONS,
+        signal: owner.signal,
+        initialPrompts: [
+          {
+            role: 'system',
+            content: this.references ? INSTRUCTIONS : BASELINE_INSTRUCTIONS,
+          },
+        ],
+      }).catch((error) => {
+        // An old rejected create must not clear a newer session after cancellation.
+        if (this.session === pending) {
+          this.session = undefined;
+          this.sessionAbort = undefined;
+        }
+        throw error;
+      });
+      this.session = pending;
+    }
+    const basePending = this.session;
+    const base = await abortable(basePending, signal);
     if (this.disposed || signal.aborted) throw new Error('Provider cancelled');
     const cloning = base.clone({ signal });
-    void cloning.then(
-      (clone) => {
-        if (signal.aborted) clone.destroy();
-      },
-      () => {},
-    );
-    const clone = await abortable(cloning, signal);
+    let clone: ModelSession | undefined;
+    const destroy = (owned: ModelSession) => {
+      try {
+        owned.destroy();
+      } catch {
+        if (this.session === basePending) this.releaseBase();
+      }
+    };
     try {
+      clone = await abortable(cloning, signal);
+      signal.throwIfAborted();
       const raw = await abortable(
         clone.prompt(
           JSON.stringify({
@@ -178,23 +212,27 @@ export class ChromePromptProvider implements Provider {
         return result ? [result] : [];
       });
     } finally {
-      clone.destroy();
-      if (!this.disposed)
-        this.idleTimer = setTimeout(() => {
-          if (this.session)
-            void this.session
-              .then((session) => session.destroy())
-              .catch(() => {});
-          this.session = undefined;
-        }, 60_000);
+      if (clone) destroy(clone);
+      else void cloning.then(destroy, () => {});
     }
   }
-  close(): void {
-    this.lifetime.abort();
+  private clearIdle(): void {
     if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
-    this.disposed = true;
-    if (this.session)
-      void this.session.then((session) => session.destroy()).catch(() => {});
+    this.idleTimer = undefined;
+  }
+  private releaseBase(): void {
+    this.clearIdle();
+    const pending = this.session,
+      owner = this.sessionAbort;
     this.session = undefined;
+    this.sessionAbort = undefined;
+    owner?.abort();
+    if (pending)
+      void pending.then((session) => session.destroy()).catch(() => {});
+  }
+  close(): void {
+    this.disposed = true;
+    this.lifetime.abort();
+    this.releaseBase();
   }
 }
