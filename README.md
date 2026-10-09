@@ -59,6 +59,8 @@ pnpm release:check           # fails until reviewed release evidence passes
 
 Browser tests cover the five adapter fixtures, nested branches, insert/remove/edit events, SPA routes, excluded composers, cache reuse, zero-inference mode changes, 1,000 loaded comments, synthetic-feed cleanup and axe accessibility checks. Traces contain invented fixtures only. See [docs/benchmarking.md](docs/benchmarking.md) for the remaining real-machine performance checks.
 
+The [release evidence reader](docs/release-input-hardening.md) accepts only bounded regular JSON-object files at approved paths. Missing, malformed, oversized or symlinked evidence fails its gates without exposing input excerpts or filesystem paths. Automated checks do not replace independent/manual approval.
+
 [ARCHITECTURE.md](ARCHITECTURE.md) explains module ownership. [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/adapter-maintenance.md](docs/adapter-maintenance.md) describe contributions. [SECURITY.md](SECURITY.md) covers vulnerability reporting. MIT licensed.
 
 [Milestone status](docs/milestones.md) separates implemented code from acceptance gates. The [model card](docs/classification.md) describes the provisional scorer and independent-corpus tooling; the [Store disclosure draft](docs/store-disclosure-draft.md) is not a public-release or submission claim. Optional local timing diagnostics and content-free export are available in Settings. On-device preparation shows progress and can be cancelled; setup never starts it automatically.
