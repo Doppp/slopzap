@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-09",
+  "scope": "invented fixtures on development M5 Pro; renderer main-thread CPU, not extension attribution or reference acceptance",
+  "browserVersion": "155.0.8059.40",
+  "environment": {
+    "os": "darwin",
+    "arch": "arm64",
+    "cpuCount": 15,
+    "cpuModel": "Apple M5 Pro",
+    "memoryBytes": 25769803776
+  },
+  "packagedBuildSha256": "0658e78fd34a41b80e67fdd6ccaab7de856201ba3510b536ba874cffd3dcff39",
+  "corrected": {
+    "sourceReport": "2026-10-09T01-55-03-641Z.json",
+    "requestedQuietSeconds": 10,
+    "cpuEmulationRemovedBeforeSettlingAndAccounting": true,
+    "allRegressionChecksPassed": true,
+    "rows": [
+      {
+        "control": "extension-absent",
+        "precedingScrollThrottle": 1,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.019,
+        "counters": {
+          "wallSeconds": 10.001335999986622,
+          "threadCpuSeconds": 0.001025,
+          "threadCpuPercent": 0.01024863078294111,
+          "taskCpuSeconds": 0.0008870000000000001
+        },
+        "quietEndpoints": true,
+        "pendingBefore": null,
+        "pendingAfter": null,
+        "classificationsBefore": null,
+        "classificationsAfter": null
+      },
+      {
+        "control": "installed-processing-disabled",
+        "precedingScrollThrottle": 1,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.019,
+        "counters": {
+          "wallSeconds": 10.001939999987371,
+          "threadCpuSeconds": 0.002451,
+          "threadCpuPercent": 0.02450524598231038,
+          "taskCpuSeconds": 0.0019879999999999997
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 0,
+        "classificationsAfter": 0
+      },
+      {
+        "control": "installed-processing-enabled",
+        "precedingScrollThrottle": 1,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.02,
+        "counters": {
+          "wallSeconds": 10.001401000015903,
+          "threadCpuSeconds": 0.008216,
+          "threadCpuPercent": 0.08214849099628077,
+          "taskCpuSeconds": 0.0069960000000000005
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 45,
+        "classificationsAfter": 45
+      },
+      {
+        "control": "extension-absent",
+        "precedingScrollThrottle": 4,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.034,
+        "counters": {
+          "wallSeconds": 10.000960000004852,
+          "threadCpuSeconds": 0.002675,
+          "threadCpuPercent": 0.026747432246491357,
+          "taskCpuSeconds": 0.001869
+        },
+        "quietEndpoints": true,
+        "pendingBefore": null,
+        "pendingAfter": null,
+        "classificationsBefore": null,
+        "classificationsAfter": null
+      },
+      {
+        "control": "installed-processing-disabled",
+        "precedingScrollThrottle": 4,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.027,
+        "counters": {
+          "wallSeconds": 10.001839999982622,
+          "threadCpuSeconds": 0.002924,
+          "threadCpuPercent": 0.02923462082981812,
+          "taskCpuSeconds": 0.002395
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 0,
+        "classificationsAfter": 0
+      },
+      {
+        "control": "installed-processing-enabled",
+        "precedingScrollThrottle": 4,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.049,
+        "counters": {
+          "wallSeconds": 10.00309000001289,
+          "threadCpuSeconds": 0.003255,
+          "threadCpuPercent": 0.03253994515690457,
+          "taskCpuSeconds": 0.002561
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 45,
+        "classificationsAfter": 45
+      }
+    ]
+  },
+  "originalContaminated": {
+    "sourceReport": "2026-10-09T01-42-16-557Z.json",
+    "requestedQuietSeconds": 60,
+    "validity": "active CPU emulation confounded 4x idle samples; do not treat them as extension CPU or clean idle acceptance",
+    "rows": [
+      {
+        "control": "extension-absent",
+        "precedingScrollThrottle": 1,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.023,
+        "counters": {
+          "wallSeconds": 60.00313399999868,
+          "threadCpuSeconds": 0.025550999999999997,
+          "threadCpuPercent": 0.04258277575968042,
+          "taskCpuSeconds": 0.0234
+        },
+        "quietEndpoints": true,
+        "pendingBefore": null,
+        "pendingAfter": null,
+        "classificationsBefore": null,
+        "classificationsAfter": null
+      },
+      {
+        "control": "installed-processing-disabled",
+        "precedingScrollThrottle": 1,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.025,
+        "counters": {
+          "wallSeconds": 60.002364999993006,
+          "threadCpuSeconds": 0.021139,
+          "threadCpuPercent": 0.03523027800654602,
+          "taskCpuSeconds": 0.017258
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 0,
+        "classificationsAfter": 0
+      },
+      {
+        "control": "installed-processing-enabled",
+        "precedingScrollThrottle": 1,
+        "idleRendererThrottle": 1,
+        "scrollDurationSeconds": 1.031,
+        "counters": {
+          "wallSeconds": 60.00268099998357,
+          "threadCpuSeconds": 0.018819,
+          "threadCpuPercent": 0.03136359856987916,
+          "taskCpuSeconds": 0.015205
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 45,
+        "classificationsAfter": 45
+      },
+      {
+        "control": "extension-absent",
+        "precedingScrollThrottle": 4,
+        "idleRendererThrottle": 4,
+        "scrollDurationSeconds": 1.051,
+        "counters": {
+          "wallSeconds": 60.00120599998627,
+          "threadCpuSeconds": 45.669934,
+          "threadCpuPercent": 76.11502675464631,
+          "taskCpuSeconds": 0.011848
+        },
+        "quietEndpoints": true,
+        "pendingBefore": null,
+        "pendingAfter": null,
+        "classificationsBefore": null,
+        "classificationsAfter": null
+      },
+      {
+        "control": "installed-processing-disabled",
+        "precedingScrollThrottle": 4,
+        "idleRendererThrottle": 4,
+        "scrollDurationSeconds": 1.051,
+        "counters": {
+          "wallSeconds": 60.000995000009425,
+          "threadCpuSeconds": 45.660539,
+          "threadCpuPercent": 76.09963634768529,
+          "taskCpuSeconds": 0.019016
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 0,
+        "classificationsAfter": 0
+      },
+      {
+        "control": "installed-processing-enabled",
+        "precedingScrollThrottle": 4,
+        "idleRendererThrottle": 4,
+        "scrollDurationSeconds": 1.052,
+        "counters": {
+          "wallSeconds": 60.00244900002144,
+          "threadCpuSeconds": 45.630539,
+          "threadCpuPercent": 76.04779431583482,
+          "taskCpuSeconds": 0.021431
+        },
+        "quietEndpoints": true,
+        "pendingBefore": 0,
+        "pendingAfter": 0,
+        "classificationsBefore": 45,
+        "classificationsAfter": 45
+      }
+    ]
+  },
+  "focusedThrottleControl": {
+    "quietSeconds": 1,
+    "threadCpuPercentAt4x": 76.10792194049397,
+    "threadCpuPercentAfterReset1x": 0.02915338373995169
+  },
+  "workerCpuMeasured": false,
+  "systemCpuMeasured": false,
+  "extensionOnlyCpuAttributed": false,
+  "referenceHardwareAcceptance": false,
+  "releaseAcceptance": false
+}
