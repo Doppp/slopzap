@@ -118,25 +118,28 @@ export function confidence(
       ];
     }),
   );
-  const { fp, tn } = metrics(rows, threshold),
-    negatives = fp + tn;
+  const { fp, tn } = metrics(rows, threshold);
+  return {
+    method: 'source-group bootstrap',
+    repetitions,
+    seed: 42,
+    intervals,
+    fprWilsonUpper: wilsonFprUpper(fp, tn),
+  };
+}
+
+export function wilsonFprUpper(fp: number, tn: number): number | null {
+  const negatives = fp + tn;
   // A zero-FP bootstrap degenerates to [0,0]; retain a Wilson upper bound as a conservative guard.
   const z = 1.96,
     p = negatives ? fp / negatives : 0;
-  const upper = negatives
+  return negatives
     ? (p +
         (z * z) / (2 * negatives) +
         z *
           Math.sqrt(
             (p * (1 - p)) / negatives + (z * z) / (4 * negatives ** 2),
           )) /
-      (1 + (z * z) / negatives)
+        (1 + (z * z) / negatives)
     : null;
-  return {
-    method: 'source-group bootstrap',
-    repetitions,
-    seed: 42,
-    intervals,
-    fprWilsonUpper: upper,
-  };
 }

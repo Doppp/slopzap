@@ -4,6 +4,11 @@ import { metrics, ranking, confidence } from '../evaluation/metrics';
 import { report } from '../evaluation/report';
 import { train, score, parseModel, FEATURE_NAMES } from '../evaluation/model';
 import { CLASSIFIER_VERSION } from '../src/shared/types';
+import { classificationChecks } from '../evaluation/classification-evidence';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 const example = (id = 'one'): Example => ({
   id,
   splitGroup: id,
@@ -136,6 +141,62 @@ test('undersized or disputed corpora cannot satisfy release gates', () => {
       },
     ]).reviewedSamples,
   ).toBe(0);
+});
+
+test('schema-v2 exports share recomputed gates and counted coverage without content', () => {
+  const result = report([example()]);
+  expect(result.schemaVersion).toBe(2);
+  expect(result.checks).toEqual(classificationChecks(result));
+  expect(result.platformCounts.reddit).toBe(1);
+  expect(result.kindCounts.reply).toBe(1);
+  expect(result.checks.requiredSlices).toBe(false);
+  expect(result.checks.reportStructure).toBe(true);
+  const exported = JSON.stringify(result);
+  expect(exported).not.toContain(example().text);
+  expect(exported).not.toContain('reviewer_a');
+});
+
+test('ambiguity remains excluded and cannot be repaired by changing pass flags', () => {
+  const result = report([{ ...example(), slices: ['technical', 'ambiguous'] }]);
+  expect(result.reviewedSamples).toBe(0);
+  expect(result.excludedAmbiguousOrUnreviewed).toBe(1);
+  expect(result.statisticalGatesPass).toBe(false);
+  expect(result.checks.independentlyReviewedHeldOut).toBe(false);
+});
+
+test('corpus CLI exports aggregate schema-v2 failures without invented text or review IDs', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'slopzap-corpus-check-test-'));
+  try {
+    const input = join(root, 'invented.json');
+    const row = {
+      ...example(),
+      text: 'Invented private canary for an evaluation smoke. It is not scientific release evidence.',
+    };
+    await writeFile(input, JSON.stringify([row]));
+    const result = spawnSync(
+      process.execPath,
+      [
+        resolve('node_modules/tsx/dist/cli.mjs'),
+        resolve('evaluation/corpus-cli.ts'),
+        'evaluate',
+        input,
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 10_000,
+      },
+    );
+    expect(result.status).toBe(1);
+    const output = JSON.parse(result.stdout);
+    expect(output.schemaVersion).toBe(2);
+    expect(output.checks).toEqual(classificationChecks(output));
+    expect(output.statisticalGatesPass).toBe(false);
+    expect(result.stdout).not.toContain(row.text);
+    expect(result.stdout).not.toContain('reviewer_a');
+    expect(result.stdout).not.toContain(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 test('training/calibration ignore held-out labels and produce a tiny experimental artifact', () => {
   const rows = ['train', 'validation', 'test'].flatMap((split) =>
