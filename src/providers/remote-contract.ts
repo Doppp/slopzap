@@ -33,11 +33,38 @@ interface Job {
   waiters: Set<Waiter>;
   controller: AbortController;
 }
+const UNIT_FIELDS = [
+  'text',
+  'parentText',
+  'rootText',
+  'quotedText',
+  'kind',
+  'platform',
+] as const;
+function validInput(value: unknown): value is ProviderInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const input = value as ProviderInput;
+  return (
+    Object.keys(input).every((field) => field === 'id' || field === 'unit') &&
+    typeof input.id === 'string' &&
+    /^[a-zA-Z0-9_-]{1,128}$/.test(input.id) &&
+    !!input.unit &&
+    typeof input.unit === 'object' &&
+    !Array.isArray(input.unit) &&
+    Object.keys(input.unit).every((field) =>
+      (UNIT_FIELDS as readonly string[]).includes(field),
+    ) &&
+    UNIT_FIELDS.every((field) => Object.hasOwn(input.unit, field)) &&
+    validUnit({ ...input.unit, id: '', parentId: null }) &&
+    input.unit.text.length <= 6000
+  );
+}
 export class MockRemoteCoordinator {
   private jobs = new Map<string, Job>();
   private queued = new Set<Job>();
   private running = 0;
   private sequence = 0;
+  private pendingWaiters = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private timerPriority: 0 | 1 | undefined;
   private closed = false;
@@ -51,6 +78,7 @@ export class MockRemoteCoordinator {
         }, ms);
         const abort = () => {
           clearTimeout(timer);
+          signal.removeEventListener('abort', abort);
           reject(new Error('Cancelled'));
         };
         signal.addEventListener('abort', abort, { once: true });
@@ -66,30 +94,24 @@ export class MockRemoteCoordinator {
     if (
       this.closed ||
       signal.aborted ||
+      typeof key !== 'string' ||
       !/^[a-f0-9]{64}$/.test(key) ||
+      (priority !== 0 && priority !== 1) ||
+      this.pendingWaiters >= 128 ||
       (this.jobs.size >= 128 && !this.jobs.has(key))
     )
       return Promise.reject(new Error('Mock queue unavailable'));
+    if (!validInput(input))
+      return Promise.reject(new Error('Mock input rejected'));
+    const existing = this.jobs.get(key);
     if (
-      !validUnit({ ...input.unit, id: '', parentId: null }) ||
-      Object.keys(input.unit).some(
-        (field) =>
-          ![
-            'text',
-            'parentText',
-            'rootText',
-            'quotedText',
-            'kind',
-            'platform',
-          ].includes(field),
-      ) ||
-      input.unit.text.length > 6000 ||
-      input.unit.parentText.length > 800 ||
-      input.unit.rootText.length > 500 ||
-      input.unit.quotedText.length > 600
+      existing &&
+      !UNIT_FIELDS.every(
+        (field) => existing.input.unit[field] === input.unit[field],
+      )
     )
       return Promise.reject(new Error('Mock input rejected'));
-    let job = this.jobs.get(key);
+    let job = existing;
     if (!job) {
       job = {
         key,
@@ -104,14 +126,16 @@ export class MockRemoteCoordinator {
     job.priority = Math.min(job.priority, priority) as 0 | 1;
     const target = job;
     const promise = new Promise<ProviderResult>((resolve, reject) => {
+      let removed = false;
       const abort = () => {
         target.waiters.delete(waiter);
         waiter.remove();
         reject(new Error('Cancelled'));
         if (!target.waiters.size) {
-          target.controller.abort();
           this.queued.delete(target);
-          this.jobs.delete(target.key);
+          if (this.jobs.get(target.key) === target)
+            this.jobs.delete(target.key);
+          target.controller.abort();
         }
       };
       const waiter: Waiter = {
@@ -119,10 +143,17 @@ export class MockRemoteCoordinator {
         resolve,
         reject,
         signal,
-        remove: () => signal.removeEventListener('abort', abort),
+        remove: () => {
+          if (removed) return;
+          removed = true;
+          signal.removeEventListener('abort', abort);
+          this.pendingWaiters--;
+        },
       };
+      this.pendingWaiters++;
       target.waiters.add(waiter);
       signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
     });
     if (this.queued.size >= 12) this.flush();
     else {
@@ -184,18 +215,27 @@ export class MockRemoteCoordinator {
     batch.forEach((job) =>
       job.controller.signal.addEventListener('abort', checkCancelled),
     );
+    checkCancelled();
     const signal = AbortSignal.any([
       controller.signal,
       AbortSignal.timeout(20000),
     ]);
     try {
       let raw: unknown;
+      let submitted: Job[] = [];
       for (let attempt = 0; attempt < 2; attempt++) {
         signal.throwIfAborted();
+        submitted = batch.filter(
+          (job) => !job.controller.signal.aborted && job.waiters.size > 0,
+        );
+        if (!submitted.length) throw new Error('Mock batch unavailable');
         try {
           raw = await abortable(
             this.transport(
-              batch.map((job) => job.input),
+              submitted.map((job) => ({
+                id: job.input.id,
+                unit: { ...job.input.unit },
+              })),
               signal,
             ),
             signal,
@@ -206,15 +246,26 @@ export class MockRemoteCoordinator {
             error instanceof TransportFailure &&
             (error.status === null ||
               [408, 429].includes(error.status) ||
-              error.status >= 500);
+              (typeof error.status === 'number' &&
+                Number.isInteger(error.status) &&
+                error.status >= 500 &&
+                error.status <= 599));
           if (!retryable || attempt || signal.aborted)
             throw new Error('Mock transport unavailable');
-          if (error.retryAfterMs > 10000)
+          if (
+            typeof error.retryAfterMs !== 'number' ||
+            !Number.isFinite(error.retryAfterMs) ||
+            error.retryAfterMs < 0 ||
+            error.retryAfterMs > 10000
+          )
             throw new Error('Mock retry delay exceeds budget');
-          await this.sleep(
-            Math.max(
-              error.retryAfterMs,
-              500 + Math.floor(Math.random() * 1000),
+          await abortable(
+            this.sleep(
+              Math.max(
+                error.retryAfterMs,
+                500 + Math.floor(Math.random() * 1000),
+              ),
+              signal,
             ),
             signal,
           );
@@ -223,7 +274,7 @@ export class MockRemoteCoordinator {
       signal.throwIfAborted();
       const results = validateOutput(
         raw,
-        batch.map((job) => job.input),
+        submitted.map((job) => job.input),
       );
       for (const job of batch) {
         const result = results.find((result) => result.id === job.input.id);
@@ -251,6 +302,8 @@ export class MockRemoteCoordinator {
   close(): void {
     this.closed = true;
     if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.timerPriority = undefined;
     for (const job of this.jobs.values()) {
       job.controller.abort();
       for (const waiter of job.waiters) {
