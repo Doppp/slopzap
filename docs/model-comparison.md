@@ -22,6 +22,14 @@ Only examples with valid output from both arms enter paired metrics, at unchange
 
 The examples are separate from the original seed and reference-guide text, but the same implementation agent authored their intended labels. They are not independently labelled held-out ground truth. A single run is sensitive to sampling, warm state and Chrome model updates; the report cannot pin a model snapshot. Repeat on eligible hardware with separate reviewed examples before making improvement claims. Model results never enter the browsing cache or corrections.
 
+## Session lifecycle
+
+Provider close now cancels availability, creation, cloning and inference waits independently of the caller's signal. Each base session has its own abort controller, consistent with Chrome's [documented session cancellation](https://developer.chrome.com/docs/ai/prompt-api#create_a_session). Cancelled or failed bases are discarded, and late-created bases or clones receive cleanup without starting a prompt. An older rejected creation or late clone-cleanup error cannot clear a newer base. Overlapping calls return no refinement rather than starting another prompt; the runtime keeps its existing local result.
+
+The sixty-second idle timer is suspended only when an eligible, available batch starts model work, then rearmed after that work settles. Empty/oversized/ineligible batches and unavailable follow-ups do not prolong an existing idle deadline; aborted calls discard the base immediately. Idle expiry and repeated close calls attempt cleanup once per owned base. A clone-cleanup exception invalidates its own base; cleanup errors are not logged with model or page data. Explicit model preparation and its user-download requirement are unchanged.
+
+Sixteen unit regressions cover cancellation across all four phases, ignored aborts, late settlement, fresh-session ownership, overlapping calls, failures and timer behavior. Five initial cases reproduced failures before the fix. Two additional browser cases cancel the packaged comparison during mocked creation or cloning, then release the late handle and verify cleanup with zero prompts. These tests establish application cleanup behavior, not actual Chrome model memory, worker/process CPU or engine cooperation when abort/destroy fails. Independent quality and native resource acceptance remain pending; prompts, output validation, thresholds and automatic hiding are unchanged.
+
 ## Development verification
 
 Unit tests cover balanced examples, label separation, alternating arm order, paired coverage, output redaction, cancellation and ignored-abort deadlines. Browser tests use mocked model responses to check no inference/download on render, trusted run clicks, unchanged preferences, exported fields, session release and accessible results. Mocked percentages are test fixtures, not Chrome model quality measurements.
