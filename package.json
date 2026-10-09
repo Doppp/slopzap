@@ -7,6 +7,7 @@
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",
+    "archive:check": "tsx scripts/archive-check.ts",
     "typecheck": "wxt prepare && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",

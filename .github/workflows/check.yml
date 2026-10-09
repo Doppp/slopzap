@@ -25,10 +25,12 @@ jobs:
       - run: pnpm benchmark --paired-long --with-absent --idle-cpu --idle-seconds=1 --duration=1
       - run: pnpm reproducibility
       - run: pnpm zip
+      - run: pnpm archive:check
+        id: archive
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: slopzap-chrome-alpha
-          path: .output/*.zip
+          path: ${{ steps.archive.outputs.path }}
           include-hidden-files: true
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
