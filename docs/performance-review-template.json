@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "kind": "reviewed-reference-performance",
+  "referenceHardwareAcceptance": false,
+  "files": {},
+  "methods": {
+    "referenceMachineAndStableChrome": false,
+    "attributableTasksAndCpu": false,
+    "actualDroppedFrames": false,
+    "postGcHeapAndRetainerReview": false,
+    "nearViewportScaling1005001000": false
+  },
+  "scenarios": [
+    {
+      "control": "absent",
+      "throttle": 1,
+      "units": 1000,
+      "evidenceId": null,
+      "scrollDurationSeconds": null,
+      "frameP95Ms": null,
+      "droppedFramePercent": null
+    },
+    {
+      "control": "disabled",
+      "throttle": 1,
+      "units": 1000,
+      "evidenceId": null,
+      "scrollDurationSeconds": null,
+      "frameP95Ms": null,
+      "droppedFramePercent": null
+    },
+    {
+      "control": "enabled",
+      "throttle": 1,
+      "units": 1000,
+      "evidenceId": null,
+      "scrollDurationSeconds": null,
+      "frameP95Ms": null,
+      "droppedFramePercent": null,
+      "remoteEnabled": false,
+      "metrics": {
+        "mutationP95Ms": null,
+        "mutationMaxMs": null,
+        "discoveryMaxMs": null,
+        "mainTaskMaxMs": null,
+        "attributableLongTasks": null,
+        "localBatch16P95Ms": null,
+        "localBatch16MedianMs": null,
+        "cache50P95Ms": null,
+        "cachedRenderP95Ms": null,
+        "uncachedLocalP95Ms": null,
+        "modeSwitch500TotalMs": null,
+        "modeSwitchChunkMaxMs": null,
+        "contentHeapAboveBaselineMiB": null,
+        "workerAndCacheHeapMiB": null,
+        "detachedBoundElementsAfterGc": null,
+        "networkMaxConcurrent": null,
+        "networkPerItemCalls": null,
+        "attributableIdleCpuPercent": null,
+        "heapAtTenMinutesMiB": null,
+        "heapAtThirtyMinutesMiB": null,
+        "detachedBoundElementsIncreasing": null,
+        "remoteP0DispatchMaxMs": null
+      }
+    },
+    {
+      "control": "absent",
+      "throttle": 4,
+      "units": 1000,
+      "evidenceId": null,
+      "scrollDurationSeconds": null,
+      "frameP95Ms": null,
+      "droppedFramePercent": null
+    },
+    {
+      "control": "disabled",
+      "throttle": 4,
+      "units": 1000,
+      "evidenceId": null,
+      "scrollDurationSeconds": null,
+      "frameP95Ms": null,
+      "droppedFramePercent": null
+    },
+    {
+      "control": "enabled",
+      "throttle": 4,
+      "units": 1000,
+      "evidenceId": null,
+      "scrollDurationSeconds": null,
+      "frameP95Ms": null,
+      "droppedFramePercent": null,
+      "remoteEnabled": false,
+      "metrics": {
+        "mutationP95Ms": null,
+        "mutationMaxMs": null,
+        "discoveryMaxMs": null,
+        "mainTaskMaxMs": null,
+        "attributableLongTasks": null,
+        "localBatch16P95Ms": null,
+        "localBatch16MedianMs": null,
+        "cache50P95Ms": null,
+        "cachedRenderP95Ms": null,
+        "uncachedLocalP95Ms": null,
+        "modeSwitch500TotalMs": null,
+        "modeSwitchChunkMaxMs": null,
+        "contentHeapAboveBaselineMiB": null,
+        "workerAndCacheHeapMiB": null,
+        "detachedBoundElementsAfterGc": null,
+        "networkMaxConcurrent": null,
+        "networkPerItemCalls": null,
+        "attributableIdleCpuPercent": null,
+        "heapAtTenMinutesMiB": null,
+        "heapAtThirtyMinutesMiB": null,
+        "detachedBoundElementsIncreasing": null,
+        "remoteP0DispatchMaxMs": null
+      }
+    }
+  ]
+}

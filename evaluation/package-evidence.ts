@@ -33,7 +33,14 @@ export function reproducibilityMatchesPackage(
     source.archiveByteEqualityClaimed !== false
   )
     return false;
-  const expected = hashMap(source.files),
+  return packagedFilesMatch(source.files, currentFiles);
+}
+
+export function packagedFilesMatch(
+  expectedFiles: unknown,
+  currentFiles: unknown,
+): boolean {
+  const expected = hashMap(expectedFiles),
     current = hashMap(currentFiles);
   if (!expected || !current) return false;
   return (

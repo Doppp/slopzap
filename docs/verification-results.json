@@ -3,7 +3,22 @@
   "date": "2026-10-09",
   "releaseReady": false,
   "verificationScope": "development alpha; not independent classifier or reference-machine acceptance",
-  "automatedTests": { "unit": 327, "chromium": 56 },
+  "automatedTests": { "unit": 420, "chromium": 56 },
+  "reviewedPerformanceContract": {
+    "scope": "evidence validation with invented fixtures; not reference-hardware acceptance",
+    "addedUnitAndCliRegressions": 93,
+    "requiredLongRunControls": 6,
+    "minimumScrollSecondsPerControl": 1800,
+    "currentPackageFileMapRequired": true,
+    "allApplicableSpecBudgetMeasurementsRequired": true,
+    "processingDisabledFrameBaselineRequired": true,
+    "missingMeasurementsRemainUnavailable": true,
+    "legacyFlagOnlyReportsRejected": true,
+    "unapprovedTemplate": "docs/performance-review-template.json",
+    "productionRuntimeChanged": false,
+    "referenceHardwareAcceptance": false,
+    "releaseReady": false
+  },
   "pairedComparison": {
     "inventedCases": 12,
     "alternatingArmOrder": true,
