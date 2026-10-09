@@ -1,5 +1,6 @@
 import { CLASSIFIER_VERSION } from '../src/shared/types';
 import { reproducibilityMatchesPackage } from './package-evidence';
+import { performanceMatchesPackage } from './performance-evidence';
 export function readiness(
   evidence: unknown,
   artifacts: {
@@ -10,7 +11,7 @@ export function readiness(
   },
 ) {
   const object = (value: unknown): Record<string, unknown> =>
-    value && typeof value === 'object'
+    value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
   const source = object(evidence),
@@ -36,8 +37,7 @@ export function readiness(
       performance.cpu1xAnd4x === true &&
       performance.detachedRetentionZero === true &&
       performance.allSpecBudgetsPassed === true &&
-      artifacts.benchmark?.referenceHardwareAcceptance === true &&
-      Number(artifacts.benchmark?.durationSeconds) >= 1800,
+      performanceMatchesPackage(artifacts.benchmark, artifacts.packagedFiles),
     reproducibility: reproducibilityMatchesPackage(
       artifacts.reproducibility,
       artifacts.packagedFiles,
