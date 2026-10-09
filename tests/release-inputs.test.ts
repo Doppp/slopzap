@@ -13,7 +13,7 @@ const cli = resolve('node_modules/tsx/dist/cli.mjs'),
   script = resolve('scripts/release-check.ts'),
   canary = 'invented-private-evidence-do-not-print';
 
-test.each([
+const inputModes = [
   'malformed',
   'null',
   'array',
@@ -28,9 +28,8 @@ test.each([
   'linked-report-directory',
   'linked-output-directory',
   'directory-report',
-  'fifo-root',
-  'fifo-report',
-])('release CLI fails closed without content or paths: %s', async (mode) => {
+];
+async function verifyInput(mode: string) {
   const root = await mkdtemp(join(tmpdir(), 'slopzap-evidence-input-test-'));
   try {
     await mkdir(join(root, 'docs'));
@@ -137,7 +136,16 @@ test.each([
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
+}
+
+test.each(inputModes)(
+  'release CLI fails closed without content or paths: %s',
+  verifyInput,
+);
+test.skipIf(process.platform === 'win32').each(['fifo-root', 'fifo-report'])(
+  'release CLI fails closed without content or paths: %s',
+  verifyInput,
+);
 
 test.each(['.output/verification', '.output/benchmarks', 'evaluation/reports'])(
   'reads object reports within the approved directory: %s',
