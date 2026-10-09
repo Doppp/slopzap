@@ -1,28 +1,15 @@
-import { readFile } from 'node:fs/promises';
 import { readiness } from '../evaluation/readiness';
 import { packageFiles } from './package-files.mjs';
-const evidence = JSON.parse(
-  await readFile('docs/release-evidence.json', 'utf8'),
-);
-async function artifact(
-  path: unknown,
-): Promise<Record<string, unknown> | undefined> {
-  if (
-    typeof path !== 'string' ||
-    !/^(\.output\/verification|\.output\/benchmarks|evaluation\/reports)\/[a-zA-Z0-9_.-]+\.json$/.test(
-      path,
-    )
-  )
-    return undefined;
-  try {
-    return JSON.parse(await readFile(path, 'utf8'));
-  } catch {
-    return undefined;
-  }
+import { releaseArtifact, releaseEvidence } from './release-inputs';
+const evidence = await releaseEvidence();
+function report(value: unknown): unknown {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>).report
+    : undefined;
 }
-const classification = await artifact(evidence.classification?.report),
-  benchmark = await artifact(evidence.performance?.report),
-  reproducibility = await artifact(evidence.reproducibility);
+const classification = await releaseArtifact(report(evidence?.classification)),
+  benchmark = await releaseArtifact(report(evidence?.performance)),
+  reproducibility = await releaseArtifact(evidence?.reproducibility);
 const packagedFiles = await packageFiles('.output/chrome-mv3').catch(
   () => undefined,
 );
