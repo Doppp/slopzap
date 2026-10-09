@@ -10,6 +10,8 @@ export interface BenchmarkPlan {
   chrome: boolean;
   workerHeap: boolean;
   detachedDom: boolean;
+  idleCpu: boolean;
+  idleSeconds: number;
   mode: 'short' | 'single-long' | 'paired-long';
   scenarios: BenchmarkScenario[];
 }

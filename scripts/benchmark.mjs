@@ -9,6 +9,8 @@ import { sampleWorkerHeap } from './worker-heap.mjs';
 import { fixtureSnapshot } from './benchmark-snapshot.mjs';
 import { sampleDetachedDom } from './detached-dom.mjs';
 import { packageFiles, packageFingerprint } from './package-files.mjs';
+import { sampleIdleCpu, quietIdleEndpoints } from './idle-cpu.mjs';
+import { targetCommand } from './cdp-target.mjs';
 const plan = benchmarkPlan(process.argv.slice(2));
 const { long, seconds, scenarios } = plan;
 const reportRoot = resolve('.output/benchmarks');
@@ -215,6 +217,7 @@ for (const scenario of scenarios) {
     }
     const final = await snapshot();
     const frame = await page.evaluate(() => globalThis.benchmark.stop());
+    const scrollDurationSeconds = (Date.now() - started) / 1000;
     const finalRegistration = await registration();
     const finalAbsent = await absentEvidence();
     // Include a post-run GC sample, not merely the last minute before 30:00.
@@ -231,6 +234,38 @@ for (const scenario of scenarios) {
       candidates: final?.stats?.candidates ?? null,
       workerHeap: await workerHeap(),
     });
+    let idleCpu = null;
+    if (plan.idleCpu) {
+      await targetCommand(cdp, 'Emulation.setCPUThrottlingRate', { rate: 1 });
+      await page.waitForTimeout(2000);
+      const before = await snapshot();
+      const visibleBefore = await page.evaluate(
+        () => document.visibilityState === 'visible',
+      );
+      const measurement = await sampleIdleCpu(context, page, plan.idleSeconds);
+      const visibleAfter = await page.evaluate(
+        () => document.visibilityState === 'visible',
+      );
+      const after = await snapshot();
+      idleCpu = {
+        rendererThrottle: 1,
+        precedingScrollThrottle: scenario.throttle,
+        measurement,
+        quietEndpoints: quietIdleEndpoints(
+          scenario.installed,
+          before,
+          after,
+          visibleBefore,
+          visibleAfter,
+        ),
+        pendingBefore: before?.aggregate?.pending ?? null,
+        pendingAfter: after?.aggregate?.pending ?? null,
+        classificationsBefore: before?.stats?.classifications ?? null,
+        classificationsAfter: after?.stats?.classifications ?? null,
+        visibleBefore,
+        visibleAfter,
+      };
+    }
     const detachedDomBeforeCleanup = plan.detachedDom
       ? await sampleDetachedDom(context, page)
       : null;
@@ -251,6 +286,13 @@ for (const scenario of scenarios) {
         : null;
     const checks = {
       framesObserved: frame.samples > 0,
+      ...(plan.idleCpu
+        ? {
+            idleCpuEvidenceAvailable:
+              idleCpu?.measurement?.status === 'measured',
+            idleCpuQuietEndpoints: idleCpu?.quietEndpoints === true,
+          }
+        : {}),
       ...(plan.detachedDom
         ? {
             detachedDomEvidenceAvailable:
@@ -313,6 +355,7 @@ for (const scenario of scenarios) {
           : 'installed-processing-disabled'
         : 'extension-absent',
       durationSeconds: (Date.now() - started) / 1000,
+      scrollDurationSeconds,
       initial: initial?.stats ?? null,
       final: final?.stats ?? null,
       timings: final?.timings ?? {},
@@ -326,6 +369,7 @@ for (const scenario of scenarios) {
       frames: frame,
       samples,
       initialWorkerHeap,
+      idleCpu,
       detachedDom: {
         beforeCleanup: detachedDomBeforeCleanup,
         afterCleanup: detachedDomAfterCleanup,
@@ -355,7 +399,7 @@ await writeFile(
   path,
   JSON.stringify(
     {
-      schemaVersion: 3,
+      schemaVersion: 4,
       packagedBuildSha256,
       packagedBuildUnchanged: true,
       environment: {
@@ -377,6 +421,19 @@ await writeFile(
         ),
         frameScope:
           'full observation interval; fixed 0.1 ms histogram; over-33-ms ratio is a proxy, not measured dropped frames',
+        idleCpuProbe: {
+          enabled: plan.idleCpu,
+          secondsPerWindow: plan.idleSeconds,
+          settleSeconds: 2,
+          rendererThrottle: 1,
+          throttleScope:
+            'CPU emulation removed before settling/accounting; scenario rate applies only to preceding scroll',
+          scope:
+            'fixture renderer main-thread CPU per wall second; includes browser/harness work, not extension-only or worker/process CPU',
+          measurement:
+            'fresh page CDP session, threadTicks enabled, ThreadTime/Timestamp deltas; no page JS, GC, snapshot or polling inside the quiet wait',
+          releaseAcceptance: false,
+        },
         workerHeapProbe: {
           enabled: plan.workerHeap,
           scope:

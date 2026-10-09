@@ -21,6 +21,8 @@ test('paired long plan has both processing controls at both renderer CPU rates',
     chrome: true,
     workerHeap: false,
     detachedDom: false,
+    idleCpu: false,
+    idleSeconds: 0,
     mode: 'paired-long',
     scenarios: [
       { installed: true, enabled: false, throttle: 1, units: 1000 },
@@ -36,6 +38,45 @@ test('legacy single long diagnostic remains explicit and can be smoked briefly',
   ]);
   expect(benchmarkPlan(['--paired-long', '--duration=1']).seconds).toBe(1);
 });
+test('idle CPU gets six separate controls and a bounded independent observation duration', () => {
+  const flags = ['--paired-long', '--with-absent', '--idle-cpu'];
+  expect(benchmarkPlan([])).toMatchObject({ idleCpu: false, idleSeconds: 0 });
+  expect(benchmarkPlan(flags)).toMatchObject({
+    idleCpu: true,
+    idleSeconds: 10,
+  });
+  const plan = benchmarkPlan([...flags, '--idle-seconds=60', '--duration=1']);
+  expect(plan.scenarios).toHaveLength(6);
+  expect(plan.idleSeconds).toBe(60);
+  expect(plan.seconds).toBe(1);
+});
+test.each(
+  [
+    ['--idle-cpu'],
+    ['--paired-long', '--idle-cpu'],
+    ['--idle-seconds=1'],
+    ...[
+      '--worker-heap',
+      '--detached-dom',
+      '--idle-seconds=0',
+      '--idle-seconds=61',
+      '--idle-seconds=1.5',
+      '--idle-cpu',
+    ].map((flag) => ['--paired-long', '--with-absent', '--idle-cpu', flag]),
+    [
+      '--paired-long',
+      '--with-absent',
+      '--idle-cpu',
+      '--idle-seconds=1',
+      '--idle-seconds=2',
+    ],
+  ].map((flags) => ({ flags })),
+)(
+  'idle CPU rejects mixed probes, absent controls and invalid/duplicate quiet durations %#',
+  ({ flags }) => {
+    expect(() => benchmarkPlan(flags)).toThrow();
+  },
+);
 test('worker heap diagnostics are opt-in and do not change the scenario matrix', () => {
   expect(benchmarkPlan([]).workerHeap).toBe(false);
   const plan = benchmarkPlan([

@@ -6,21 +6,48 @@ export function benchmarkPlan(argv) {
     '--with-absent',
     '--worker-heap',
     '--detached-dom',
+    '--idle-cpu',
   ];
   if (
     argv.some(
       (value) =>
-        !known.includes(value) && !/^--duration=\d+(?:\.\d+)?$/.test(value),
+        !known.includes(value) &&
+        !/^--duration=\d+(?:\.\d+)?$/.test(value) &&
+        !/^--idle-seconds=\d+$/.test(value),
     )
   )
     throw new Error('Unknown benchmark argument');
   if (
     new Set(argv).size !== argv.length ||
-    argv.filter((value) => value.startsWith('--duration=')).length > 1
+    argv.filter((value) => value.startsWith('--duration=')).length > 1 ||
+    argv.filter((value) => value.startsWith('--idle-seconds=')).length > 1
   )
     throw new Error('Duplicate benchmark argument');
   if (argv.includes('--long') && argv.includes('--paired-long'))
     throw new Error('Choose one long-run mode');
+  const idleCpu = argv.includes('--idle-cpu');
+  if (
+    idleCpu &&
+    (!argv.includes('--paired-long') ||
+      !argv.includes('--with-absent') ||
+      argv.includes('--worker-heap') ||
+      argv.includes('--detached-dom'))
+  )
+    throw new Error('Idle CPU requires separate paired absent controls');
+  if (!idleCpu && argv.some((value) => value.startsWith('--idle-seconds=')))
+    throw new Error('Idle duration requires idle CPU diagnostics');
+  const idleSeconds = idleCpu
+    ? Number(
+        argv
+          .find((value) => value.startsWith('--idle-seconds='))
+          ?.split('=')[1] ?? 10,
+      )
+    : 0;
+  if (
+    idleCpu &&
+    (!Number.isSafeInteger(idleSeconds) || idleSeconds < 1 || idleSeconds > 60)
+  )
+    throw new Error('Idle duration must be 1–60 seconds');
   const long = argv.includes('--long') || argv.includes('--paired-long');
   const seconds = Number(
     argv.find((value) => value.startsWith('--duration='))?.split('=')[1] ??
@@ -54,6 +81,8 @@ export function benchmarkPlan(argv) {
     chrome: argv.includes('--chrome'),
     workerHeap: argv.includes('--worker-heap'),
     detachedDom: argv.includes('--detached-dom'),
+    idleCpu,
+    idleSeconds,
     mode: argv.includes('--paired-long')
       ? 'paired-long'
       : long
