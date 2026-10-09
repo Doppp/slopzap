@@ -17,7 +17,7 @@ Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, 
 
 Setup opens automatically only once. Closing it unfinished leaves an **Open quick setup** reminder in the popup; finishing saves completion and preferences locally. Updates and browser restarts preserve your settings. Existing alpha installations can start setup from the popup, and **Settings & privacy → Review quick setup** opens it again whenever you want. The synthetic test feed also stays available in Settings.
 
-`pnpm zip` creates a distributable archive in `.output/`. GitHub's Checks workflow also uploads a tested development-alpha archive. The extension has not been submitted to the Chrome Web Store.
+`pnpm zip` creates an archive in `.output/`. Run `pnpm reproducibility` before packaging and `pnpm archive:check` afterward to verify its exact contents. GitHub's Checks workflow uploads only the verified development-alpha ZIP. See the [packaging handoff](docs/release-candidate.md). The extension has not been submitted to the Chrome Web Store.
 
 ## Modes
 
@@ -54,6 +54,7 @@ pnpm live:smoke              # optional isolated-Chrome public smoke; never rele
 pnpm toolbar:smoke           # actual Chrome popup; invented active discussion only
 pnpm benchmark --with-absent --duration=5 # absent/disabled/enabled synthetic controls
 pnpm reproducibility         # compare two packaged builds
+pnpm zip && pnpm archive:check # verify the ZIP against current/reproduced files
 pnpm release:check           # fails until reviewed release evidence passes
 ```
 

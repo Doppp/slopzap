@@ -40,6 +40,39 @@ async function readJson(
   path: string,
   root: string,
 ): Promise<Record<string, unknown> | undefined> {
+  const buffer = await boundedReleaseBytes(path, root, MAX_RELEASE_JSON_BYTES);
+  if (!buffer) return undefined;
+  try {
+    const value: unknown = JSON.parse(
+      new TextDecoder('utf-8', { fatal: true }).decode(buffer),
+    );
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Callers impose their own file allowlist. Never pass browsing-derived paths.
+export async function boundedReleaseBytes(
+  path: string,
+  root: string,
+  maximumBytes: number,
+): Promise<Buffer | undefined> {
+  if (
+    !Number.isSafeInteger(maximumBytes) ||
+    maximumBytes < 1 ||
+    maximumBytes > MAX_RELEASE_JSON_BYTES ||
+    path.length > 256 ||
+    path
+      .split('/')
+      .some(
+        (part) =>
+          !/^[a-zA-Z0-9_.-]+$/.test(part) || part === '.' || part === '..',
+      )
+  )
+    return undefined;
   try {
     let directory = resolve(root);
     const parents: { path: string; info: Stats }[] = [];
@@ -56,7 +89,7 @@ async function readJson(
       !info.isFile() ||
       info.isSymbolicLink() ||
       info.size < 1 ||
-      info.size > MAX_RELEASE_JSON_BYTES
+      info.size > maximumBytes
     )
       return undefined;
     const file = await open(
@@ -89,14 +122,7 @@ async function readJson(
         )
           return undefined;
       }
-      const value: unknown = JSON.parse(
-        new TextDecoder('utf-8', { fatal: true }).decode(
-          buffer.subarray(0, size),
-        ),
-      );
-      return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : undefined;
+      return buffer.subarray(0, size);
     } finally {
       await file.close();
     }

@@ -9,7 +9,10 @@ const fs = vi.hoisted(() => ({
   close: vi.fn(),
 }));
 vi.mock('node:fs/promises', () => ({ lstat: fs.lstat, open: fs.open }));
-import { releaseArtifact } from '../scripts/release-inputs';
+import {
+  releaseArtifact,
+  boundedReleaseBytes,
+} from '../scripts/release-inputs';
 
 const path = '.output/verification/invented.json',
   root = '/invented-root',
@@ -173,3 +176,24 @@ test('unapproved paths do not issue filesystem operations', async () => {
   expect(fs.lstat).not.toHaveBeenCalled();
   expect(fs.open).not.toHaveBeenCalled();
 });
+
+test.each([0, -1, 1.5, NaN, Infinity, 1_048_577])(
+  'binary reader rejects invalid byte limits before filesystem access: %s',
+  async (limit) => {
+    expect(await boundedReleaseBytes(path, root, limit)).toBeUndefined();
+    expect(fs.lstat).not.toHaveBeenCalled();
+  },
+);
+test.each([
+  '../invented.zip',
+  '/invented.zip',
+  'a//invented.zip',
+  'a\\invented.zip',
+  'a/./invented.zip',
+])(
+  'binary reader rejects unsafe paths before filesystem access: %s',
+  async (path) => {
+    expect(await boundedReleaseBytes(path, root, 100)).toBeUndefined();
+    expect(fs.lstat).not.toHaveBeenCalled();
+  },
+);
